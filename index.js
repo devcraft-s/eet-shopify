@@ -55,7 +55,7 @@ function loadShopifyConfig() {
 
 /**
  * Get all Shopify products first
- * @returns {Promise<Array>} Array of all Shopify products
+ * @returns {Promise<Object>} Object containing products array and shopifyClient
  */
 async function getAllShopifyProducts() {
   try {
@@ -76,7 +76,10 @@ async function getAllShopifyProducts() {
       totalCount: allProducts.length
     });
     
-    return allProducts;
+    return {
+      products: allProducts,
+      client: shopifyClient
+    };
     
   } catch (error) {
     logger.error('SHOPIFY', 'Failed to fetch Shopify products', {
@@ -110,7 +113,7 @@ async function main() {
     logger.info('APP', 'Application UI started');
     
     // STEP 1: Get all Shopify products first
-    const shopifyProducts = await getAllShopifyProducts();
+    const { products: shopifyProducts, client: shopifyClient } = await getAllShopifyProducts();
     
     // Create filter instance
     const filter = new EETProductFilter();
@@ -142,9 +145,6 @@ async function main() {
     
     // STEP 3: Test the EET to Shopify mapping with first product
     if (jsonData.products.length > 0) {
-      const shopifyConfig = loadShopifyConfig();
-      const shopifyClient = new ShopifyClient(shopifyConfig);
-      
       const firstEETProduct = jsonData.products[0];
       const mappedProduct = shopifyClient.mapEETToShopifyProduct(firstEETProduct);
       
