@@ -174,15 +174,16 @@ async function main() {
     const registeredProducts = [];
     
     for (const eetProduct of jsonData.products) {
-      const existingProduct = shopifyClient.findProductBySKU(eetProduct.varenr, shopifyProducts);
+      const mappedProduct = shopifyClient.mapEETToShopifyProduct(eetProduct);
+      const existingProduct = shopifyClient.findProductBySKU(mappedProduct.variants[0].sku, shopifyProducts);
       
       if (existingProduct) {
         registeredProducts.push({
-          eetProduct,
+          mappedProduct,
           shopifyProduct: existingProduct
         });
       } else {
-        unregisteredProducts.push(eetProduct);
+        unregisteredProducts.push(mappedProduct);
       }
     }
     
@@ -198,11 +199,12 @@ async function main() {
       logger.info('UNREGISTERED_PRODUCTS', 'Sample of unregistered products', {
         count: unregisteredProducts.length,
         sample: unregisteredProducts.slice(0, 5).map(p => ({
-          varenr: p.varenr,
-          beskrivelse: p.beskrivelse,
-          maerke_navn: p.maerke_navn,
-          pris: p.pris,
-          lagerbeholdning: p.lagerbeholdning
+          title: p.title,
+          vendor: p.vendor,
+          sku: p.variants[0].sku,
+          price: p.variants[0].price,
+          inventoryQuantity: p.variants[0].inventoryQuantity,
+          productType: p.productType
         }))
       });
     }
@@ -212,8 +214,10 @@ async function main() {
       logger.info('REGISTERED_PRODUCTS', 'Sample of registered products', {
         count: registeredProducts.length,
         sample: registeredProducts.slice(0, 5).map(rp => ({
-          varenr: rp.eetProduct.varenr,
-          beskrivelse: rp.eetProduct.beskrivelse,
+          title: rp.mappedProduct.title,
+          vendor: rp.mappedProduct.vendor,
+          sku: rp.mappedProduct.variants[0].sku,
+          price: rp.mappedProduct.variants[0].price,
           shopifyId: rp.shopifyProduct.id,
           shopifyTitle: rp.shopifyProduct.title
         }))
