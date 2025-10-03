@@ -77,11 +77,9 @@ class ShopifyClient {
     try {
       logger.info('SHOPIFY', 'Getting all products', { limit, hasCursor: !!cursor });
 
-      let variablesForQuery = `first: ${limit}, after: ${cursor ? `'${cursor}'` : null}`;
-
       const query = `
         query getProducts($first: Int!, $after: String) {
-          products(${variablesForQuery}) {
+          products(first: $first, after: $after) {
             edges {
               node {
                 id

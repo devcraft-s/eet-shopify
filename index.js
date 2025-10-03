@@ -107,20 +107,10 @@ async function main() {
       eetPriceFile
     });
     
-    // console.log('🚀 Starting EET Product Filter Application');
-    // console.log('═'.repeat(60));
-    // console.log(`🌍 Environment: ${production}`);
-    // console.log(`🗣️  Language: ${language}`);
-    // console.log(`📁 EET Price File: ${eetPriceFile}`);
-    // console.log('');
     logger.info('APP', 'Application UI started');
     
     // STEP 1: Get all Shopify products first
     const shopifyProducts = await getAllShopifyProducts();
-    
-    // console.log('\n📋 Shopify Products Summary:');
-    // console.log(`📦 Total products in Shopify: ${shopifyProducts.length}`);
-    // console.log('');
     
     // Create filter instance
     const filter = new EETProductFilter();
@@ -128,11 +118,6 @@ async function main() {
     
     // STEP 2: Run the filter with the EET prices file and get JSON data
     const jsonData = await filter.run(eetPriceFile);
-    
-    // console.log('\n🎉 EET Filtering completed successfully!');
-    // console.log(`📊 Found ${jsonData.metadata.totalProducts} products matching your criteria`);
-    // console.log(`📈 Original products: ${jsonData.metadata.originalCount}`);
-    // console.log(`🔍 Filter applied: ${jsonData.metadata.filterDate}`);
     
     // Log filter results
     logger.logFilterProcess({
@@ -154,9 +139,6 @@ async function main() {
         web_category_name: p.web_category_name
       }))
     });
-    
-    // STEP 3: Products are ready for further processing
-    // (Upload logic can be implemented separately)
     
     // Log application completion
     logger.logAppEnd({
@@ -184,11 +166,6 @@ async function main() {
 
 // Run the application
 main().then(result => {
-  // You can now use result.shopifyProducts and result.eetData for further processing
-  // console.log('\n💡 Data is ready for further processing!');
-  // console.log(`🛒 Shopify products: ${result.shopifyProducts.length} items`);
-  // console.log(`📦 EET filtered products: ${result.eetData.products.length} items`);
-  // console.log(`📊 Total EET products processed: ${result.eetData.metadata.totalProducts}`);
   console.log("Start!");
 }).catch(console.error);
 
