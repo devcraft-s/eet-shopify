@@ -292,9 +292,100 @@ async function main() {
     // STEP 6: Make Shopify products that are not on the EET list into drafts
     const draftResults = await shopifyClient.makeOrphanedProductsDraft(shopifyProducts, jsonData.products);
 
-    // STEP 7: Update price inventory quantity
-    // Run at scheduled intervals
-    await startUpdatePriceAndInventoryQuantity(jsonData.products);
+    // STEP 7: Update inventory quantity with EET data
+    console.log('🔐 Starting EET login...');
+    
+    const EETClient = (await import('./module/eet.js')).default;
+    const eetClient = new EETClient();
+    
+    const loginResult = await eetClient.login();
+
+    if (!loginResult.success) {
+      console.log('❌ EET login failed:', loginResult.error);
+    } else {
+      console.log('✅ EET login successful');
+      console.log('🔑 Token received:', loginResult.token ? 'Yes' : 'No');
+      if (loginResult.expiration) {
+        console.log('⏰ Token expires:', loginResult.expiration);
+      }
+
+      // Get all products price and stock from EET
+      console.log('📊 Getting products price and stock data...');
+      
+      const eetPriceAndStock = await eetClient.getAllProductsPriceAndStock(jsonData.products);
+
+      console.log("eetPriceAndStock", eetPriceAndStock);
+      
+      if (eetPriceAndStock.success === false) {
+        console.log('❌ Failed to get products data:', eetPriceAndStock.error);
+      } else {
+        console.log('✅ Products data retrieved successfully');
+        
+        if (isLoggingEnabled) {
+          logger.info('EET_UPDATE', 'Products data retrieved', {
+            itemsCount: eetPriceAndStock.length,
+            sampleItems: eetPriceAndStock.slice(0, 3)
+          });
+        }
+
+        // Process the data and update Shopify products
+        if (eetPriceAndStock && eetPriceAndStock.length > 0) {
+          console.log(`📈 Processing ${eetPriceAndStock.length} products for inventory updates`);
+          
+          // Log sample data for debugging
+          console.log('Sample EET API data:');
+          eetPriceAndStock.slice(0, 2).forEach(item => {
+            console.log(`  - ${item.ItemId}: Stock=${item.Stock?.length || 0} locations`);
+          });
+          
+          console.log(`🔄 Updating ${shopifyProducts.length} Shopify products with EET inventory data...`);
+          
+          let successCount = 0;
+          let errorCount = 0;
+          
+          // Update each product with EET inventory data
+          for (const eetItem of eetPriceAndStock) {
+            try {
+              const sku = eetItem.ItemId;
+              const stock = eetItem.Stock?.reduce((sum, s) => sum + parseInt(s.Quantity || 0), 0) || null;
+
+              if (stock !== null) {
+                const result = await shopifyClient.updateProductInventory(sku, stock, shopifyProducts);
+
+                if (result.success) {
+                  successCount++;
+                  console.log(`✅ Updated ${sku}: Stock=${stock}`);
+                } else {
+                  errorCount++;
+                  console.log(`❌ Failed ${sku}: ${result.error}`);
+                }
+              } else {
+                console.log(`⚠️ Skipped ${sku}: No stock data available`);
+              }
+
+              // Add small delay to avoid rate limiting
+              await new Promise(resolve => setTimeout(resolve, 200));
+
+            } catch (error) {
+              errorCount++;
+              console.log(`❌ Error updating ${eetItem.ItemId}: ${error.message}`);
+            }
+          }
+          
+          console.log(`\n📈 Inventory Update Results:`);
+          console.log(`✅ Successfully updated: ${successCount} products`);
+          console.log(`❌ Failed: ${errorCount} products`);
+          
+          if (isLoggingEnabled) {
+            logger.info('EET_UPDATE', 'Inventory update process completed', {
+              processedCount: eetPriceAndStock.length,
+              successCount,
+              errorCount
+            });
+          }
+        }
+      }
+    }
     
     // Log application completion
     if (isLoggingEnabled) {
@@ -331,111 +422,3 @@ main().then(result => {
   console.log("END!");
   process.exit(1);
 }).catch(console.error);
-
-async function startUpdatePriceAndInventoryQuantity(eetProducts) {
-  try {
-    // STEP 1: Login to EET
-    console.log('🔐 Starting EET login...');
-    
-    const EETClient = (await import('./module/eet.js')).default;
-    const eetClient = new EETClient();
-    
-    const loginResult = await eetClient.login();
-
-    if (!loginResult.success) {
-      console.log('❌ EET login failed:', loginResult.error);
-      return;
-    }
-
-    console.log('🔑 Token received:', loginResult.token ? 'Yes' : 'No');
-    if (loginResult.expiration) {
-      console.log('⏰ Token expires:', loginResult.expiration);
-    }
-
-    // STEP 2: Get all products price and stock from EET
-    console.log('📊 Getting products price and stock data...');
-    
-    const eetPriceAndStock = await eetClient.getAllProductsPriceAndStock(eetProducts);
-
-    console.log("eetPriceAndStock", eetPriceAndStock);
-    
-    if (eetPriceAndStock.success === false) {
-      console.log('❌ Failed to get products data:', eetPriceAndStock.error);
-      return;
-    }
-
-    console.log('✅ Products data retrieved successfully');
-    
-    if (isLoggingEnabled) {
-      logger.info('EET_UPDATE', 'Products data retrieved', {
-        itemsCount: eetPriceAndStock.length,
-        sampleItems: eetPriceAndStock.slice(0, 3)
-      });
-    }
-
-    // STEP 3: Process the data and update Shopify products
-    if (eetPriceAndStock && eetPriceAndStock.length > 0) {
-      console.log(`📈 Processing ${eetPriceAndStock.length} products for inventory updates`);
-      
-      // Log sample data for debugging
-      console.log('Sample EET API data:');
-      eetPriceAndStock.slice(0, 2).forEach(item => {
-        console.log(`  - ${item.ItemId}: Stock=${item.Stock?.length || 0} locations`);
-      });
-      
-      console.log(`🔄 Updating ${allShopifyProducts.length} Shopify products with EET inventory data...`);
-      
-      let successCount = 0;
-      let errorCount = 0;
-      
-      // Update each product with EET inventory data
-      for (const eetItem of eetPriceAndStock) {
-        try {
-          const sku = eetItem.ItemId;
-          const stock = eetItem.Stock?.reduce((sum, s) => sum + parseInt(s.Quantity || 0), 0) || null;
-
-          if (stock !== null) {
-            const result = await shopifyClient.updateProductInventory(sku, stock, allShopifyProducts);
-
-            if (result.success) {
-              successCount++;
-              console.log(`✅ Updated ${sku}: Stock=${stock}`);
-            } else {
-              errorCount++;
-              console.log(`❌ Failed ${sku}: ${result.error}`);
-            }
-          } else {
-            console.log(`⚠️ Skipped ${sku}: No stock data available`);
-          }
-
-          // Add small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 200));
-
-        } catch (error) {
-          errorCount++;
-          console.log(`❌ Error updating ${eetItem.ItemId}: ${error.message}`);
-        }
-      }
-      
-      console.log(`\n📈 Inventory Update Results:`);
-      console.log(`✅ Successfully updated: ${successCount} products`);
-      console.log(`❌ Failed: ${errorCount} products`);
-      
-      if (isLoggingEnabled) {
-        logger.info('EET_UPDATE', 'Inventory update process completed', {
-          processedCount: eetPriceAndStock.length,
-          successCount,
-          errorCount
-        });
-      }
-    }
-  } catch (error) {
-    if (isLoggingEnabled) {
-      logger.error('EET_UPDATE', 'Price and inventory update failed', {
-        error: error.message,
-        stack: error.stack
-      });
-    }
-    console.log('❌ Price and inventory update failed:', error.message);
-  }
-}
