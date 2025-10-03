@@ -163,7 +163,8 @@ class ShopifyClient {
       for (const product of existingProducts) {
         if (product.variants && product.variants.nodes) {
           for (const variant of product.variants.nodes) {
-            if (variant.inventoryItem.sku === sku) {
+            // Check both variant.sku and variant.inventoryItem.sku for compatibility
+            if ((variant.inventoryItem && variant.inventoryItem.sku === sku)) {
               if (isLoggingEnabled) {
                 logger.info('SHOPIFY_FIND', 'Product found by SKU', {
                   sku,
