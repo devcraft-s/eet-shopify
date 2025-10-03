@@ -1,5 +1,12 @@
 import logger from './logger.js';
 import fetch from 'node-fetch';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+// Check if logging is disabled
+const isLoggingEnabled = process.env.LOGGING !== 'false';
 
 /**
  * Shopify GraphQL Client
@@ -350,7 +357,104 @@ class ShopifyClient {
    * @returns {Promise<Object>} Created product
    */
   async createProduct(productData) {
-    
+    try {
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_CREATE', 'Creating new product', {
+          title: productData.title,
+          sku: productData.variants[0]?.sku
+        });
+      }
+
+      // Extract data from productData
+      const title = productData.title || '';
+      const vendor = productData.vendor || '';
+      const descriptionHtml = productData.bodyHtml || '';
+      const imageUrl = productData.images && productData.images.length > 0 ? productData.images[0].src : null;
+      
+      // Build metafields array
+      const metafields = productData.metafields ? productData.metafields.map(mf => 
+        `{
+          key: "${mf.key}",
+          namespace: "${mf.namespace}",
+          value: "${mf.value}"
+        }`
+      ).join(',') : '';
+
+      const mutation = `
+        mutation {
+          productCreate(
+            ${imageUrl ? `media: { originalSource: "${imageUrl}", mediaContentType: IMAGE }` : ''}
+            product: {
+              title: "${title}",
+              status: ACTIVE,
+              vendor: "${vendor}",
+              descriptionHtml: "${descriptionHtml}",
+              ${metafields ? `metafields: [${metafields}]` : ''}
+            }
+          ) {
+            userErrors {
+              field
+              message
+            }
+            product {
+              id
+              title
+              variants(first: 50) {
+                nodes {
+                  id
+                  price
+                  inventoryQuantity
+                  barcode
+                  inventoryItem {
+                    id
+                    inventoryLevels(first: 10) {
+                      nodes {
+                        location {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await this.runGraphQL(mutation);
+
+      if (response.data.productCreate.userErrors.length > 0) {
+        const errors = response.data.productCreate.userErrors;
+        if (isLoggingEnabled) {
+          logger.error('SHOPIFY_CREATE', 'Product creation failed with user errors', {
+            title: productData.title,
+            errors
+          });
+        }
+        throw new Error(`Product creation failed: ${errors.map(e => e.message).join(', ')}`);
+      }
+
+      const createdProduct = response.data.productCreate.product;
+      
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_CREATE', 'Product created successfully', {
+          productId: createdProduct.id,
+          title: createdProduct.title,
+          variantsCount: createdProduct.variants.nodes.length
+        });
+      }
+
+      return createdProduct;
+    } catch (error) {
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_CREATE', 'Failed to create product', {
+          title: productData.title,
+          error: error.message
+        });
+      }
+      throw error;
+    }
   }
 }
 
