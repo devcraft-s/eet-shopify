@@ -34,7 +34,6 @@ class ShopifyClient {
 
       // Combine descriptions for body HTML
       const descriptions = [];
-      if (eetProduct.beskrivelse) descriptions.push(eetProduct.beskrivelse);
       if (eetProduct.beskrivelse_2) descriptions.push(eetProduct.beskrivelse_2);
       if (eetProduct.beskrivelse_3) descriptions.push(eetProduct.beskrivelse_3);
       
