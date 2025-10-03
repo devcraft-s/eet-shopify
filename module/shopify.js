@@ -41,12 +41,17 @@ class ShopifyClient {
         ? `<ul>${descriptions.map(desc => `<li>${desc}</li>`).join('')}</ul>`
         : '';
 
-      // Convert weight from kg to grams (assuming EET weights are in kg)
-      let weightInGrams = null;
-      if (eetProduct.bruttovægt) {
+      // Convert weight from kg to kg (keep original unit)
+      let weightInKg = null;
+      let weightUnit = 'KILOGRAMS';
+      if (eetProduct.bruttovægt && eetProduct.bruttovægt > 0) {
         const weightStr = String(eetProduct.bruttovægt);
         const cleanWeight = weightStr.replace(',', '.');
-        weightInGrams = parseFloat(cleanWeight);
+        const weight = parseFloat(cleanWeight);
+        if (weight > 0) {
+          weightInKg = weight;
+          weightUnit = 'KILOGRAMS';
+        }
       }
 
       // Parse price (remove commas and convert to cents)
@@ -78,8 +83,8 @@ class ShopifyClient {
         variants: [{
           sku: eetProduct.varenr,
           price: priceInCents ? (priceInCents / 100).toFixed(2) : '0.00',
-          weight: weightInGrams,
-          weightUnit: 'KILOGRAMS',
+          weight: weightInKg,
+          weightUnit: weightUnit,
           barcode: eetProduct.ean_upc || '',
           inventoryQuantity: stockQuantity,
           inventoryManagement: 'SHOPIFY'
@@ -493,8 +498,6 @@ class ShopifyClient {
                 price
                 barcode
                 id
-                weight
-                weightUnit
               }
             }
           }
