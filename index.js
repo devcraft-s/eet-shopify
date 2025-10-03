@@ -243,6 +243,7 @@ async function main() {
     
     // STEP 5: Register unregistered products in Shopify
     if (unregisteredProducts.length > 0) {
+      console.log("unregisteredProducts");
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_REGISTER', 'Starting to register unregistered products', {
           count: unregisteredProducts.length
@@ -254,6 +255,7 @@ async function main() {
       const errors = [];
       
       for (const product of unregisteredProducts) {
+        console.log("product", product.variants[0].sku);
         try {
           const createdProduct = await shopifyClient.createProduct(product);
           successCount++;
@@ -272,6 +274,7 @@ async function main() {
           await new Promise(resolve => setTimeout(resolve, 200));
           
         } catch (error) {
+          console.log("Error creating product:", product.variants[0].sku, error.message);
           errorCount++;
           errors.push({
             sku: product.variants[0].sku,
@@ -310,6 +313,7 @@ async function main() {
           console.log(`  - ${error.sku} (${error.title}): ${error.error}`);
         });
       }
+      console.log("Registration process completed!");
     } else {
       console.log(`\n✅ All products are already registered in Shopify!`);
     }
@@ -323,8 +327,7 @@ async function main() {
         logFile: logger.getCurrentLogFile()
       });
     }
-    
-    console.log(unregisteredProducts, registeredProducts);
+
     // Return the JSON data for further processing
     return {
       shopifyProducts,
@@ -347,6 +350,6 @@ async function main() {
 
 // Run the application
 main().then(result => {
-  console.log("Start!");
+  console.log("END!");
 }).catch(console.error);
 

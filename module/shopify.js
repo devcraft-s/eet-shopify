@@ -357,6 +357,7 @@ class ShopifyClient {
    * @returns {Promise<Object>} Created product
    */
   async createProduct(productData) {
+    console.log("productData", productData.variants[0].sku);
     try {
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_CREATE', 'Creating new product', {
@@ -423,6 +424,7 @@ class ShopifyClient {
       `;
 
       const response = await this.runGraphQL(mutation);
+      console.log("response", response);
 
       if (response.data.productCreate.userErrors.length > 0) {
         const errors = response.data.productCreate.userErrors;
