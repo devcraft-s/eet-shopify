@@ -46,7 +46,7 @@ class ShopifyClient {
       if (eetProduct.bruttovægt) {
         const weightStr = String(eetProduct.bruttovægt);
         const cleanWeight = weightStr.replace(',', '.');
-        weightInGrams = parseFloat(cleanWeight) * 1000;
+        weightInGrams = parseFloat(cleanWeight);
       }
 
       // Parse price (remove commas and convert to cents)
@@ -79,7 +79,7 @@ class ShopifyClient {
           sku: eetProduct.varenr,
           price: priceInCents ? (priceInCents / 100).toFixed(2) : '0.00',
           weight: weightInGrams,
-          weightUnit: 'GRAMS',
+          weightUnit: 'KILOGRAMS',
           barcode: eetProduct.ean_upc || '',
           inventoryQuantity: stockQuantity,
           inventoryManagement: 'SHOPIFY'
@@ -374,7 +374,7 @@ class ShopifyClient {
    * @returns {Promise<Object>} Created product
    */
   async createProduct(productData) {
-    console.log("productData", productData.variants[0].sku);
+    console.log("productData", JSON.stringify(productData));
     try {
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_CREATE', 'Creating new product', {
@@ -457,7 +457,7 @@ class ShopifyClient {
 
       const createdProduct = response.data.productCreate.product;
 
-      // Update variant with SKU, barcode, and price
+      // Update variant with SKU, barcode, and price, product weight, product weight unit
       if (createdProduct.variants.nodes.length > 0) {
         const variant = createdProduct.variants.nodes[0];
         const adjustedPrice = productData.variants[0].price;
@@ -472,7 +472,16 @@ class ShopifyClient {
                 price: "${adjustedPrice}",
                 id: "${variant.id}",
                 barcode: "${barcode}",
-                inventoryItem: {sku: "${sku}", tracked: true}
+                inventoryItem: {
+                  sku: "${sku}", 
+                  tracked: true,
+                  measurement: {
+                    weight: {
+                      value: "${productData.variants[0].weight}",
+                      unit: "${productData.variants[0].weightUnit}"
+                    }
+                  }
+                }
               }
             ) {
               userErrors {
@@ -484,6 +493,8 @@ class ShopifyClient {
                 price
                 barcode
                 id
+                weight
+                weightUnit
               }
             }
           }
