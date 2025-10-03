@@ -273,6 +273,13 @@ class ShopifyClient {
                     price
                     inventoryItem {
                       sku
+                      inventoryLevels(first: 10) {
+                        nodes {
+                          location {
+                            id
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -855,6 +862,163 @@ class ShopifyClient {
         });
       }
       throw error;
+    }
+  }
+
+  /**
+   * Update product inventory quantity only
+   * @param {string} sku - Product SKU to update
+   * @param {number} newQuantity - New inventory quantity
+   * @param {Array} shopifyProducts - Array of all Shopify products
+   * @returns {Promise<Object>} Update result
+   */
+  async updateProductInventory(sku, newQuantity, shopifyProducts) {
+    try {
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_UPDATE_INVENTORY', 'Starting inventory update', {
+          sku,
+          newQuantity
+        });
+      }
+
+      // Find the product by SKU
+      const product = this.findProductBySKU(sku, shopifyProducts);
+      
+      if (!product) {
+        const error = `Product with SKU ${sku} not found`;
+        if (isLoggingEnabled) {
+          logger.warn('SHOPIFY_UPDATE_INVENTORY', 'Product not found', { sku });
+        }
+        return { success: false, error };
+      }
+
+      const variant = product.variants.nodes[0];
+      if (!variant) {
+        const error = `No variants found for product ${sku}`;
+        if (isLoggingEnabled) {
+          logger.error('SHOPIFY_UPDATE_INVENTORY', 'No variants found', { sku, productId: product.id });
+        }
+        return { success: false, error };
+      }
+
+      // Update inventory if provided
+      if (newQuantity !== null && newQuantity !== undefined && variant.inventoryItem) {
+        try {
+          if (variant.inventoryItem.inventoryLevels.nodes.length > 0) {
+            const inventoryQuantity = newQuantity;
+
+            const inventoryMutation = `
+              mutation {
+                inventoryAdjustQuantities(
+                  input: {
+                    name: "available",
+                    changes: {
+                      delta: ${inventoryQuantity},
+                      inventoryItemId: "${variant.inventoryItem.id}",
+                      locationId: "${variant.inventoryItem.inventoryLevels.nodes[0].location.id}"
+                    },
+                    reason: "restock"
+                  }
+                ) {
+                  userErrors {
+                    code
+                    field
+                    message
+                  }
+                  inventoryAdjustmentGroup {
+                    id
+                  }
+                }
+              }
+            `;
+
+            const inventoryResponse = await this.runGraphQL(inventoryMutation);
+
+            if (inventoryResponse.data.inventoryAdjustQuantities.userErrors.length > 0) {
+              const errors = inventoryResponse.data.inventoryAdjustQuantities.userErrors;
+              const errorMessage = `Inventory update failed: ${errors.map(e => e.message).join(', ')}`;
+              
+              if (isLoggingEnabled) {
+                logger.error('SHOPIFY_UPDATE_INVENTORY', 'Inventory update failed', {
+                  sku,
+                  productId: product.id,
+                  quantity: newQuantity,
+                  errors
+                });
+              }
+              
+              return { success: false, sku, error: errorMessage };
+            } else {
+              if (isLoggingEnabled) {
+                logger.info('SHOPIFY_UPDATE_INVENTORY', 'Inventory updated successfully', {
+                  sku,
+                  productId: product.id,
+                  quantity: newQuantity,
+                  adjustmentGroupId: inventoryResponse.data.inventoryAdjustQuantities.inventoryAdjustmentGroup.id
+                });
+              }
+              
+              return {
+                success: true,
+                sku,
+                productId: product.id,
+                quantity: newQuantity,
+                adjustmentGroupId: inventoryResponse.data.inventoryAdjustQuantities.inventoryAdjustmentGroup.id
+              };
+            }
+          } else {
+            const error = 'No inventory location found for product';
+            
+            if (isLoggingEnabled) {
+              logger.warn('SHOPIFY_UPDATE_INVENTORY', 'No inventory location found', {
+                sku,
+                productId: product.id
+              });
+            }
+            
+            return { success: false, sku, error };
+          }
+        } catch (error) {
+          const errorMessage = `Inventory update error: ${error.message}`;
+          
+          if (isLoggingEnabled) {
+            logger.error('SHOPIFY_UPDATE_INVENTORY', 'Inventory update exception', {
+              sku,
+              productId: product.id,
+              error: error.message
+            });
+          }
+          
+          return { success: false, sku, error: errorMessage };
+        }
+      } else {
+        const error = 'No inventory item found or quantity not provided';
+        
+        if (isLoggingEnabled) {
+          logger.warn('SHOPIFY_UPDATE_INVENTORY', 'No inventory item or quantity', {
+            sku,
+            productId: product.id,
+            hasInventoryItem: !!variant.inventoryItem,
+            quantity: newQuantity
+          });
+        }
+        
+        return { success: false, sku, error };
+      }
+
+    } catch (error) {
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_UPDATE_INVENTORY', 'Update failed', {
+          sku,
+          error: error.message,
+          stack: error.stack
+        });
+      }
+      return {
+        success: false,
+        sku,
+        error: error.message
+      };
     }
   }
 }

@@ -375,17 +375,57 @@ async function startUpdatePriceAndInventoryQuantity(eetProducts) {
 
     // STEP 3: Process the data and update Shopify products
     if (eetPriceAndStock && eetPriceAndStock.length > 0) {
-      console.log(`📈 Processing ${eetPriceAndStock.length} products for price/inventory updates`);
+      console.log(`📈 Processing ${eetPriceAndStock.length} products for inventory updates`);
       
       // Log sample data for debugging
       console.log('Sample EET API data:');
       eetPriceAndStock.slice(0, 2).forEach(item => {
-        console.log(`  - ${item.ItemId}: Price=${item.Price?.Price || 'N/A'}, Stock=${item.Stock?.length || 0} locations`);
+        console.log(`  - ${item.ItemId}: Stock=${item.Stock?.length || 0} locations`);
       });
       
+      console.log(`🔄 Updating ${allShopifyProducts.length} Shopify products with EET inventory data...`);
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      // Update each product with EET inventory data
+      for (const eetItem of eetPriceAndStock) {
+        try {
+          const sku = eetItem.ItemId;
+          const stock = eetItem.Stock?.reduce((sum, s) => sum + parseInt(s.Quantity || 0), 0) || null;
+
+          if (stock !== null) {
+            const result = await shopifyClient.updateProductInventory(sku, stock, allShopifyProducts);
+
+            if (result.success) {
+              successCount++;
+              console.log(`✅ Updated ${sku}: Stock=${stock}`);
+            } else {
+              errorCount++;
+              console.log(`❌ Failed ${sku}: ${result.error}`);
+            }
+          } else {
+            console.log(`⚠️ Skipped ${sku}: No stock data available`);
+          }
+
+          // Add small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
+
+        } catch (error) {
+          errorCount++;
+          console.log(`❌ Error updating ${eetItem.ItemId}: ${error.message}`);
+        }
+      }
+      
+      console.log(`\n📈 Inventory Update Results:`);
+      console.log(`✅ Successfully updated: ${successCount} products`);
+      console.log(`❌ Failed: ${errorCount} products`);
+      
       if (isLoggingEnabled) {
-        logger.info('EET_UPDATE', 'Price and inventory update process completed', {
-          processedCount: eetPriceAndStock.length
+        logger.info('EET_UPDATE', 'Inventory update process completed', {
+          processedCount: eetPriceAndStock.length,
+          successCount,
+          errorCount
         });
       }
     }
