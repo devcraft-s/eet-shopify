@@ -59,8 +59,6 @@ function loadShopifyConfig() {
   }
 }
 
-
-
 /**
  * Main application entry point
  * First gets all Shopify products, then runs CSV parsing and filtering for EET products
@@ -296,6 +294,7 @@ async function main() {
 
     // STEP 7: Update price inventory quantity
     // Run at scheduled intervals
+    await startUpdatePriceAndInventoryQuantity();
     
     // Log application completion
     if (isLoggingEnabled) {
@@ -332,3 +331,15 @@ main().then(result => {
   console.log("END!");
   process.exit(1);
 }).catch(console.error);
+
+async function startUpdatePriceAndInventoryQuantity() {
+  // STEP 1: Login to EET
+  console.log('🔐 Starting EET login...');
+  
+  const EETClient = (await import('./module/eet.js')).default;
+  const eetClient = new EETClient();
+  
+  const loginResult = await eetClient.login();
+
+  console.log('✅ EET login successful', loginResult);
+}
