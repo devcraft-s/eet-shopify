@@ -348,6 +348,10 @@ async function startUpdatePriceAndInventoryQuantity(eetProducts) {
     }
 
     console.log('✅ EET login successful');
+    console.log('🔑 Token received:', loginResult.token ? 'Yes' : 'No');
+    if (loginResult.expiration) {
+      console.log('⏰ Token expires:', loginResult.expiration);
+    }
 
     // STEP 2: Get all products price and stock from EET
     console.log('📊 Getting products price and stock data...');

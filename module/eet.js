@@ -55,14 +55,15 @@ class EETClient {
       const result = await response.json();
       
       // Check if we got a JWT token in the response
-      if (result.token || result.access_token || result.jwt) {
-        this.sessionToken = result.token || result.access_token || result.jwt;
+      if (result.Token || result.token || result.access_token || result.jwt) {
+        this.sessionToken = result.Token || result.token || result.access_token || result.jwt;
         this.isAuthenticated = true;
         
         if (isLoggingEnabled) {
           logger.info('EET_LOGIN', 'EET login successful with token', {
             hasToken: !!this.sessionToken,
-            tokenLength: this.sessionToken ? this.sessionToken.length : 0
+            tokenLength: this.sessionToken ? this.sessionToken.length : 0,
+            expiration: result.Expiration || 'Not provided'
           });
         }
         
@@ -71,6 +72,7 @@ class EETClient {
         return {
           success: true,
           token: this.sessionToken,
+          expiration: result.Expiration,
           message: 'Login successful'
         };
       } else {
