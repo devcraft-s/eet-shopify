@@ -500,7 +500,13 @@ class ShopifyClient {
     try {
       logger.info('SHOPIFY', 'Starting product upload process', {
         sku: eetProduct.varenr,
-        title: eetProduct.beskrivelse
+        title: eetProduct.beskrivelse,
+        brand: eetProduct.maerke_navn,
+        price: eetProduct.pris,
+        stock: eetProduct.lagerbeholdning,
+        category: eetProduct.web_category_name,
+        ean: eetProduct.ean_upc,
+        manufacturer_part: eetProduct.manufacturer_part_no
       });
 
       // Check if product exists
@@ -509,7 +515,10 @@ class ShopifyClient {
       if (existingProduct) {
         logger.info('SHOPIFY', 'Product already exists, skipping creation', {
           sku: eetProduct.varenr,
-          productId: existingProduct.id
+          productId: existingProduct.id,
+          existingTitle: existingProduct.title,
+          existingVendor: existingProduct.vendor,
+          existingPrice: existingProduct.variants.edges[0]?.node.price
         });
         return existingProduct;
       }
@@ -521,6 +530,10 @@ class ShopifyClient {
       logger.info('SHOPIFY', 'Product upload completed successfully', {
         sku: eetProduct.varenr,
         productId: createdProduct.id,
+        createdTitle: createdProduct.title,
+        createdVendor: createdProduct.vendor,
+        createdPrice: createdProduct.variants.edges[0]?.node.price,
+        createdInventory: createdProduct.variants.edges[0]?.node.inventoryQuantity,
         action: 'created'
       });
 

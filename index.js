@@ -84,6 +84,11 @@ async function uploadProductsToShopify(products) {
         logger.info('SHOPIFY', 'Product processed successfully', {
           sku: product.varenr,
           productId: result.id,
+          title: product.beskrivelse,
+          brand: product.maerke_navn,
+          price: product.pris,
+          stock: product.lagerbeholdning,
+          category: product.web_category_name,
           action: 'uploaded'
         });
 
@@ -99,6 +104,9 @@ async function uploadProductsToShopify(products) {
         
         logger.error('SHOPIFY', 'Product upload failed', {
           sku: product.varenr,
+          title: product.beskrivelse,
+          brand: product.maerke_navn,
+          price: product.pris,
           error: error.message
         });
       }
@@ -180,20 +188,16 @@ async function main() {
       limit: jsonData.metadata.filterConfig.include_products_limit
     });
     
-    // Example: Access the JSON data
-    console.log('\n📋 Sample of filtered products (first 3):');
-    jsonData.products.slice(0, 3).forEach((product, index) => {
-      console.log(`${index + 1}. ${product.varenr} - ${product.beskrivelse} (${product.maerke_navn}) - DKK ${product.pris}`);
-    });
-    
-    // Log sample products
-    logger.info('FILTER', 'Sample products displayed', {
-      sampleCount: Math.min(3, jsonData.products.length),
-      products: jsonData.products.slice(0, 3).map(p => ({
+    // Log all filtered products (real data)
+    logger.info('FILTER', 'All filtered products', {
+      totalCount: jsonData.products.length,
+      products: jsonData.products.map(p => ({
         varenr: p.varenr,
         beskrivelse: p.beskrivelse,
         maerke_navn: p.maerke_navn,
-        pris: p.pris
+        pris: p.pris,
+        lagerbeholdning: p.lagerbeholdning,
+        web_category_name: p.web_category_name
       }))
     });
     
