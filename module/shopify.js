@@ -151,32 +151,41 @@ class ShopifyClient {
    */
   findProductBySKU(sku, existingProducts) {
     try {
-      logger.info('SHOPIFY_FIND', 'Searching for product by SKU', { sku });
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_FIND', 'Searching for product by SKU', { sku });
+      }
 
-      // This is a simplified search - in a real implementation, you'd want to query Shopify
-      // for products with specific SKUs using GraphQL
+      // Search through products with the updated structure
       for (const product of existingProducts) {
-        if (product.variants && product.variants.edges) {
-          for (const variant of product.variants.edges) {
-            if (variant.node.sku === sku) {
-              logger.info('SHOPIFY_FIND', 'Product found by SKU', {
-                sku,
-                productId: product.id,
-                title: product.title
-              });
+        if (product.variants && product.variants.nodes) {
+          for (const variant of product.variants.nodes) {
+            if (variant.sku === sku) {
+              if (isLoggingEnabled) {
+                logger.info('SHOPIFY_FIND', 'Product found by SKU', {
+                  sku,
+                  productId: product.id,
+                  title: product.title,
+                  variantPrice: variant.price,
+                  variantBarcode: variant.barcode
+                });
+              }
               return product;
             }
           }
         }
       }
 
-      logger.info('SHOPIFY_FIND', 'Product not found by SKU', { sku });
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_FIND', 'Product not found by SKU', { sku });
+      }
       return null;
     } catch (error) {
-      logger.error('SHOPIFY_FIND', 'Failed to find product by SKU', {
-        sku,
-        error: error.message
-      });
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_FIND', 'Failed to find product by SKU', {
+          sku,
+          error: error.message
+        });
+      }
       throw error;
     }
   }
@@ -251,6 +260,13 @@ class ShopifyClient {
             edges {
               node {
                 id
+                variants(first: 10) {
+                  nodes {
+                    barcode
+                    price
+                    sku
+                  }
+                }
               }
               cursor
             }
