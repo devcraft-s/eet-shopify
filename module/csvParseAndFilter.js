@@ -206,7 +206,7 @@ class EETProductFilter {
   displayProducts(products) {
     console.log('\n📋 Filtered Product List:');
     console.log('═'.repeat(120));
-    console.log(
+    // console.log(
     //   'SKU'.padEnd(15) + 
     //   'Brand'.padEnd(15) + 
     //   'Description'.padEnd(40) + 
