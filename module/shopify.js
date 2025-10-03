@@ -260,6 +260,8 @@ class ShopifyClient {
             edges {
               node {
                 id
+                title
+                status
                 variants(first: 10) {
                   nodes {
                     barcode
@@ -733,8 +735,15 @@ class ShopifyClient {
       // Create EET SKU set for fast lookup
       const eetSkus = new Set(eetProducts.map(p => p.varenr));
       
-      // Find Shopify products not in EET list
+      // Find Shopify products not in EET list (excluding already draft products)
+      let alreadyDraftCount = 0;
       const shopifyProductsNotInEET = shopifyProducts.filter(shopifyProduct => {
+        // Skip if product is already in draft status
+        if (shopifyProduct.status === 'DRAFT') {
+          alreadyDraftCount++;
+          return false;
+        }
+        
         if (shopifyProduct.variants && shopifyProduct.variants.nodes) {
           return shopifyProduct.variants.nodes.some(variant => 
             variant.sku && !eetSkus.has(variant.sku)
@@ -742,6 +751,15 @@ class ShopifyClient {
         }
         return false;
       });
+
+      if (alreadyDraftCount > 0) {
+        console.log(`\n📝 Skipped ${alreadyDraftCount} products that are already in draft status`);
+        if (isLoggingEnabled) {
+          logger.info('SHOPIFY_DRAFT', 'Skipped already draft products', {
+            count: alreadyDraftCount
+          });
+        }
+      }
 
       if (shopifyProductsNotInEET.length === 0) {
         console.log(`\n✅ All Shopify products are present in the EET list!`);
