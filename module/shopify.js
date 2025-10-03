@@ -22,7 +22,7 @@ class ShopifyClient {
   async runGraphQL(query, variables = {}) {
     try {
       logger.info('SHOPIFY_GRAPHQL', 'Executing GraphQL query', {
-        query: query.substring(0, 100) + '...',
+        query: query.substring(0, 200) + '...',
         variables
       });
 
@@ -77,7 +77,7 @@ class ShopifyClient {
     try {
       logger.info('SHOPIFY', 'Getting all products', { limit, hasCursor: !!cursor });
 
-      let variablesForQuery = `first: ${250}, after: ${cursor}`;
+      let variablesForQuery = `first: ${limit}, after: ${cursor ? `'${cursor}'` : null}`;
 
       const query = `
         query getProducts($first: Int!, $after: String) {

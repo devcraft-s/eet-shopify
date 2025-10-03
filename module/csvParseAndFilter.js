@@ -40,7 +40,7 @@ class EETProductFilter {
         return;
       }
 
-      console.log(`📁 Reading EET prices file: ${filePath}`);
+      // console.log(`📁 Reading EET prices file: ${filePath}`);
       
       createReadStream(filePath, { encoding: 'utf8' })
         .pipe(csv({
@@ -72,7 +72,7 @@ class EETProductFilter {
           }
         })
         .on('end', () => {
-          console.log(`✅ Parsed ${products.length} products from CSV`);
+          // console.log(`✅ Parsed ${products.length} products from CSV`);
           this.products = products;
           resolve(products);
         })
@@ -136,7 +136,7 @@ class EETProductFilter {
    * @returns {Array} Filtered products
    */
   filterProducts(products) {
-    console.log('🔍 Applying filters...');
+    // console.log('🔍 Applying filters...');
     
     let filteredProducts = products;
 
@@ -156,7 +156,7 @@ class EETProductFilter {
           
           return brandMatch || skuMatch;
         });
-        console.log(`📦 After include filters: ${filteredProducts.length} products`);
+        // console.log(`📦 After include filters: ${filteredProducts.length} products`);
       }
     }
 
@@ -167,7 +167,7 @@ class EETProductFilter {
         filteredProducts = filteredProducts.filter(product => 
           !excludeBrands.includes(product.maerke_navn.toLowerCase())
         );
-        console.log(`📦 After brand exclude filter: ${filteredProducts.length} products`);
+        // console.log(`📦 After brand exclude filter: ${filteredProducts.length} products`);
       }
 
       if (this.filterConfig.exclude.sku && this.filterConfig.exclude.sku.length > 0) {
@@ -175,7 +175,7 @@ class EETProductFilter {
         filteredProducts = filteredProducts.filter(product => 
           !excludeSkus.includes(product.varenr.toLowerCase())
         );
-        console.log(`📦 After SKU exclude filter: ${filteredProducts.length} products`);
+        // console.log(`📦 After SKU exclude filter: ${filteredProducts.length} products`);
       }
     }
 
@@ -184,7 +184,7 @@ class EETProductFilter {
       const limit = this.filterConfig.include_products_limit;
       if (filteredProducts.length > limit) {
         filteredProducts = filteredProducts.slice(0, limit);
-        console.log(`📦 After product limit (${limit}): ${filteredProducts.length} products`);
+        // console.log(`📦 After product limit (${limit}): ${filteredProducts.length} products`);
       }
     }
 
@@ -196,17 +196,17 @@ class EETProductFilter {
    * @param {Array} products - Products to display
    */
   displayProducts(products) {
-    console.log('\n📋 Filtered Product List:');
-    console.log('═'.repeat(120));
-    console.log(
-      'SKU'.padEnd(15) + 
-      'Brand'.padEnd(15) + 
-      'Description'.padEnd(40) + 
-      'Price'.padEnd(10) + 
-      'Stock'.padEnd(8) + 
-      'Category'.padEnd(20)
-    );
-    console.log('─'.repeat(120));
+    // console.log('\n📋 Filtered Product List:');
+    // console.log('═'.repeat(120));
+    // console.log(
+    //   'SKU'.padEnd(15) + 
+    //   'Brand'.padEnd(15) + 
+    //   'Description'.padEnd(40) + 
+    //   'Price'.padEnd(10) + 
+    //   'Stock'.padEnd(8) + 
+    //   'Category'.padEnd(20)
+    // );
+    // console.log('─'.repeat(120));
 
     products.forEach(product => {
       const description = product.beskrivelse.length > 37 
@@ -217,18 +217,18 @@ class EETProductFilter {
         ? product.web_category_name.substring(0, 17) + '...'
         : product.web_category_name;
 
-      console.log(
-        product.varenr.padEnd(15) +
-        product.maerke_navn.padEnd(15) +
-        description.padEnd(40) +
-        `DKK ${product.pris.toFixed(2)}`.padEnd(10) +
-        product.lagerbeholdning.toString().padEnd(8) +
-        category.padEnd(20)
-      );
+      // console.log(
+      //   product.varenr.padEnd(15) +
+      //   product.maerke_navn.padEnd(15) +
+      //   description.padEnd(40) +
+      //   `DKK ${product.pris.toFixed(2)}`.padEnd(10) +
+      //   product.lagerbeholdning.toString().padEnd(8) +
+      //   category.padEnd(20)
+      // );
     });
 
-    console.log('─'.repeat(120));
-    console.log(`📊 Total filtered products: ${products.length}`);
+    // console.log('─'.repeat(120));
+    // console.log(`📊 Total filtered products: ${products.length}`);
   }
 
   /**
@@ -253,7 +253,7 @@ class EETProductFilter {
       };
 
       fs.writeFileSync(filename, JSON.stringify(output, null, 2));
-      console.log(`💾 Saved ${products.length} filtered products to ${filename}`);
+      // console.log(`💾 Saved ${products.length} filtered products to ${filename}`);
     } catch (error) {
       console.error('❌ Error saving file:', error.message);
     }
@@ -269,8 +269,8 @@ class EETProductFilter {
   async run(filePath = 'eet_prices.txt', displayResults = true, saveToFile = true) {
     try {
       if (displayResults) {
-        console.log('🚀 Starting EET Product Filter');
-        console.log('═'.repeat(50));
+        // console.log('🚀 Starting EET Product Filter');
+        // console.log('═'.repeat(50));
       }
 
       // Parse CSV
@@ -294,7 +294,7 @@ class EETProductFilter {
       if (displayResults) {
         // Display results
         this.displayProducts(filteredProducts);
-        console.log('\n✅ Filtering completed successfully!');
+        // console.log('\n✅ Filtering completed successfully!');
       }
       
       if (saveToFile) {

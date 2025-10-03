@@ -108,7 +108,7 @@ class Logger {
    */
   info(module, message, data = null) {
     const logMessage = this.formatMessage('INFO', module, message, data);
-    console.log(logMessage);
+    // console.log(logMessage);
     this.writeToFile('INFO', module, message, data);
   }
 
@@ -144,7 +144,7 @@ class Logger {
    */
   debug(module, message, data = null) {
     const logMessage = this.formatMessage('DEBUG', module, message, data);
-    console.log(logMessage);
+    // console.log(logMessage);
     this.writeToFile('DEBUG', module, message, data);
   }
 
