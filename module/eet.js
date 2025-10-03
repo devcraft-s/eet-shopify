@@ -34,7 +34,6 @@ class EETClient {
       if (!username || !password) {
         throw new Error('EET_USERNAME and EET_PASSWORD environment variables are required');
       }
-
       const loginData = {
         UserName: username,
         Password: password
@@ -49,34 +48,13 @@ class EETClient {
         body: JSON.stringify(loginData)
       });
 
-      if (!response.ok) {
-        throw new Error(`EET login failed with status: ${response.status} ${response.statusText}`);
+      if (response.status !== 200) {
+        throw new Error('EET login failed');
       }
 
       const result = await response.json();
-
-      if (result.success || result.token || result.SessionToken) {
-        // Store the session token (adjust based on actual response structure)
-        this.sessionToken = result.token || result.SessionToken || result.sessionToken;
-        this.isAuthenticated = true;
-
-        if (isLoggingEnabled) {
-          logger.info('EET_LOGIN', 'EET login successful', {
-            hasToken: !!this.sessionToken,
-            responseKeys: Object.keys(result)
-          });
-        }
-
-        console.log('✅ EET login successful');
-
-        return {
-          success: true,
-          token: this.sessionToken,
-          message: 'Login successful'
-        };
-      } else {
-        throw new Error(`EET login failed: ${result.message || result.error || 'Unknown error'}`);
-      }
+      
+      return result;
 
     } catch (error) {
       if (isLoggingEnabled) {

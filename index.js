@@ -294,7 +294,7 @@ async function main() {
 
     // STEP 7: Update price inventory quantity
     // Run at scheduled intervals
-    await startUpdatePriceAndInventoryQuantity();
+    // await startUpdatePriceAndInventoryQuantity();
     
     // Log application completion
     if (isLoggingEnabled) {
