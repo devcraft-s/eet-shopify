@@ -157,7 +157,6 @@ class EETClient {
 
       const requestBody = { Items: items };
 
-      console.log("requestBody", JSON.stringify(requestBody));
 
       const response = await fetch(`${this.baseUrl}/product`, {
         method: 'POST',
@@ -182,7 +181,6 @@ class EETClient {
         });
       }
 
-      console.log(`✅ Retrieved price and stock data for ${productsArray.length} products`);
 
       return productsArray;
 

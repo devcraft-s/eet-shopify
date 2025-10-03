@@ -214,7 +214,6 @@ async function main() {
     
     // STEP 5: Register unregistered products in Shopify
     if (unregisteredProducts.length > 0) {
-      console.log("unregisteredProducts");
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_REGISTER', 'Starting to register unregistered products', {
           count: unregisteredProducts.length
@@ -226,7 +225,6 @@ async function main() {
       const errors = [];
       
       for (const product of unregisteredProducts) {
-        console.log("product", product.variants[0].sku);
         try {
           const createdProduct = await shopifyClient.createProduct(product);
           successCount++;
@@ -241,7 +239,6 @@ async function main() {
             });
           }
           
-          // Add small delay to avoid rate limiting
           await new Promise(resolve => setTimeout(resolve, 200));
           
         } catch (error) {
@@ -273,118 +270,58 @@ async function main() {
           errors: errors.length > 0 ? errors : undefined
         });
       }
-      
-      console.log(`\n🛒 Product Registration Results:`);
-      console.log(`✅ Successfully registered: ${successCount} products`);
-      console.log(`❌ Failed: ${errorCount} products`);
-      
-      if (errors.length > 0) {
-        console.log(`\n❌ Registration Errors:`);
-        errors.forEach(error => {
-          console.log(`  - ${error.sku} (${error.title}): ${error.error}`);
-        });
-      }
-      console.log("Registration process completed!");
-    } else {
-      console.log(`\n✅ All products are already registered in Shopify!`);
     }
 
     // STEP 6: Make Shopify products that are not on the EET list into drafts
     const draftResults = await shopifyClient.makeOrphanedProductsDraft(shopifyProducts, jsonData.products);
 
-    // STEP 7: Update inventory quantity with EET data
-    console.log('🔐 Starting EET login...');
-    
+    // STEP 7: Update price with EET data
     const EETClient = (await import('./module/eet.js')).default;
     const eetClient = new EETClient();
     
     const loginResult = await eetClient.login();
 
-    if (!loginResult.success) {
-      console.log('❌ EET login failed:', loginResult.error);
-    } else {
-      console.log('✅ EET login successful');
-      console.log('🔑 Token received:', loginResult.token ? 'Yes' : 'No');
-      if (loginResult.expiration) {
-        console.log('⏰ Token expires:', loginResult.expiration);
-      }
-
-      // Get all products price and stock from EET
-      console.log('📊 Getting products price and stock data...');
-      
+    if (loginResult.success) {
       const eetPriceAndStock = await eetClient.getAllProductsPriceAndStock(jsonData.products);
-
-      console.log("eetPriceAndStock", eetPriceAndStock);
       
-      if (eetPriceAndStock.success === false) {
-        console.log('❌ Failed to get products data:', eetPriceAndStock.error);
-      } else {
-        console.log('✅ Products data retrieved successfully');
+      if (eetPriceAndStock && eetPriceAndStock.length > 0) {
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const eetItem of eetPriceAndStock) {
+          try {
+            const sku = eetItem.ItemId;
+            const price = eetItem.Price?.Price || null;
+
+            if (price !== null) {
+              const result = await shopifyClient.updateProductPrice(sku, price, shopifyProducts);
+
+              if (result.success) {
+                successCount++;
+              } else {
+                errorCount++;
+                console.log(`❌ Failed ${sku}: ${result.error}`);
+              }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+          } catch (error) {
+            errorCount++;
+            console.log(`❌ Error updating ${eetItem.ItemId}: ${error.message}`);
+          }
+        }
         
         if (isLoggingEnabled) {
-          logger.info('EET_UPDATE', 'Products data retrieved', {
-            itemsCount: eetPriceAndStock.length,
-            sampleItems: eetPriceAndStock.slice(0, 3)
+          logger.info('EET_UPDATE', 'Price update process completed', {
+            processedCount: eetPriceAndStock.length,
+            successCount,
+            errorCount
           });
-        }
-
-        // Process the data and update Shopify products
-        if (eetPriceAndStock && eetPriceAndStock.length > 0) {
-          console.log(`📈 Processing ${eetPriceAndStock.length} products for price updates`);
-          
-          // Log sample data for debugging
-          console.log('Sample EET API data:');
-          eetPriceAndStock.slice(0, 2).forEach(item => {
-            console.log(`  - ${item.ItemId}: Price=${item.Price?.Price || 'N/A'}`);
-          });
-          
-          console.log(`🔄 Updating ${shopifyProducts.length} Shopify products with EET price data...`);
-          
-          let successCount = 0;
-          let errorCount = 0;
-          
-          // Update each product with EET price data
-          for (const eetItem of eetPriceAndStock) {
-            try {
-              const sku = eetItem.ItemId;
-              const price = eetItem.Price?.Price || null;
-
-              if (price !== null) {
-                const result = await shopifyClient.updateProductPrice(sku, price, shopifyProducts);
-
-                if (result.success) {
-                  successCount++;
-                  console.log(`✅ Updated ${sku}: Price=${(price/100).toFixed(2)}`);
-                } else {
-                  errorCount++;
-                  console.log(`❌ Failed ${sku}: ${result.error}`);
-                }
-              } else {
-                console.log(`⚠️ Skipped ${sku}: No price data available`);
-              }
-
-              // Add small delay to avoid rate limiting
-              await new Promise(resolve => setTimeout(resolve, 200));
-
-            } catch (error) {
-              errorCount++;
-              console.log(`❌ Error updating ${eetItem.ItemId}: ${error.message}`);
-            }
-          }
-          
-          console.log(`\n📈 Price Update Results:`);
-          console.log(`✅ Successfully updated: ${successCount} products`);
-          console.log(`❌ Failed: ${errorCount} products`);
-          
-          if (isLoggingEnabled) {
-            logger.info('EET_UPDATE', 'Price update process completed', {
-              processedCount: eetPriceAndStock.length,
-              successCount,
-              errorCount
-            });
-          }
         }
       }
+    } else {
+      console.log('❌ EET login failed:', loginResult.error);
     }
     
     // Log application completion

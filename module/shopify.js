@@ -776,9 +776,8 @@ class ShopifyClient {
         return false;
       });
 
-      if (alreadyDraftCount > 0) {
-        console.log(`\n📝 Skipped ${alreadyDraftCount} products that are already in draft status`);
-        if (isLoggingEnabled) {
+      if (isLoggingEnabled) {
+        if (alreadyDraftCount > 0) {
           logger.info('SHOPIFY_DRAFT', 'Skipped already draft products', {
             count: alreadyDraftCount
           });
@@ -786,7 +785,6 @@ class ShopifyClient {
       }
 
       if (shopifyProductsNotInEET.length === 0) {
-        console.log(`\n✅ All Shopify products are present in the EET list!`);
         return {
           totalProducts: 0,
           successCount: 0,
@@ -794,8 +792,6 @@ class ShopifyClient {
           errors: []
         };
       }
-
-      console.log(`\n📝 Found ${shopifyProductsNotInEET.length} Shopify products not in EET list`);
       
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_DRAFT', 'Starting to make products draft', {
@@ -808,13 +804,10 @@ class ShopifyClient {
       const draftErrors = [];
 
       for (const product of shopifyProductsNotInEET) {
-        console.log(`Making draft: ${product.title} (${product.variants.nodes[0]?.sku || 'unknown'})`);
-
         const result = await this.makeProductDraft(product);
 
         if (result.success) {
           draftSuccessCount++;
-          console.log(`✅ Made draft: ${result.title}`);
         } else {
           draftErrorCount++;
           draftErrors.push({
@@ -825,7 +818,6 @@ class ShopifyClient {
           console.log(`❌ Failed to make draft: ${result.title} - ${result.error}`);
         }
 
-        // Add small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
@@ -838,16 +830,6 @@ class ShopifyClient {
         });
       }
 
-      console.log(`\n📝 Draft Process Results:`);
-      console.log(`✅ Successfully made draft: ${draftSuccessCount} products`);
-      console.log(`❌ Failed to make draft: ${draftErrorCount} products`);
-
-      if (draftErrors.length > 0) {
-        console.log(`\n❌ Draft Errors:`);
-        draftErrors.forEach(error => {
-          console.log(`  - ${error.sku} (${error.title}): ${error.error}`);
-        });
-      }
 
       return {
         totalProducts: shopifyProductsNotInEET.length,
