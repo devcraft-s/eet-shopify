@@ -16,7 +16,7 @@ class ShopifyClient {
   constructor(config) {
     this.shopDomain = config.shopDomain;
     this.accessToken = config.accessToken;
-    this.apiVersion = config.apiVersion || '2024-01';
+    this.apiVersion = config.apiVersion || '2025-10';
     this.apiUrl = `https://${this.shopDomain}/admin/api/${this.apiVersion}/graphql.json`;
   }
 
@@ -424,7 +424,7 @@ class ShopifyClient {
       `;
 
       const response = await this.runGraphQL(mutation);
-      console.log("response", response);
+      console.log("response", response.data.productCreate.userErrors);
 
       if (response.data.productCreate.userErrors.length > 0) {
         const errors = response.data.productCreate.userErrors;
