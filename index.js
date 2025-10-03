@@ -1,4 +1,5 @@
 import EETProductFilter from './module/csvParseAndFilter.js';
+import logger from './module/logger.js';
 
 /**
  * Main application entry point
@@ -6,11 +7,16 @@ import EETProductFilter from './module/csvParseAndFilter.js';
  */
 async function main() {
   try {
+    // Log application start
+    logger.logAppStart();
+    
     console.log('🚀 Starting EET Product Filter Application');
     console.log('═'.repeat(60));
+    logger.info('APP', 'Application UI started');
     
     // Create filter instance
     const filter = new EETProductFilter();
+    logger.info('FILTER', 'Filter instance created');
     
     // Run the filter with the EET prices file and get JSON data
     const jsonData = await filter.run('eet_prices.txt');
@@ -20,16 +26,46 @@ async function main() {
     console.log(`📈 Original products: ${jsonData.metadata.originalCount}`);
     console.log(`🔍 Filter applied: ${jsonData.metadata.filterDate}`);
     
+    // Log filter results
+    logger.logFilterProcess({
+      totalProducts: jsonData.metadata.totalProducts,
+      originalCount: jsonData.metadata.originalCount,
+      filterDate: jsonData.metadata.filterDate,
+      limit: jsonData.metadata.filterConfig.include_products_limit
+    });
+    
     // Example: Access the JSON data
     console.log('\n📋 Sample of filtered products (first 3):');
     jsonData.products.slice(0, 3).forEach((product, index) => {
       console.log(`${index + 1}. ${product.varenr} - ${product.beskrivelse} (${product.maerke_navn}) - DKK ${product.pris}`);
     });
     
+    // Log sample products
+    logger.info('FILTER', 'Sample products displayed', {
+      sampleCount: Math.min(3, jsonData.products.length),
+      products: jsonData.products.slice(0, 3).map(p => ({
+        varenr: p.varenr,
+        beskrivelse: p.beskrivelse,
+        maerke_navn: p.maerke_navn,
+        pris: p.pris
+      }))
+    });
+    
+    // Log application completion
+    logger.logAppEnd({
+      totalProducts: jsonData.metadata.totalProducts,
+      originalCount: jsonData.metadata.originalCount,
+      logFile: logger.getCurrentLogFile()
+    });
+    
     // Return the JSON data for further processing
     return jsonData;
     
   } catch (error) {
+    logger.error('APP', 'Application failed', {
+      error: error.message,
+      stack: error.stack
+    });
     console.error('❌ Application failed:', error.message);
     process.exit(1);
   }

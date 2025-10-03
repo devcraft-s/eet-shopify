@@ -1,0 +1,6 @@
+[2025-10-03T01:03:01.577Z] [INFO] [APP] EET Shopify Application started | {"timestamp":"2025-10-03T01:03:01.571Z","nodeVersion":"v22.14.0","platform":"win32"}
+[2025-10-03T01:03:01.579Z] [INFO] [APP] Application UI started
+[2025-10-03T01:03:01.580Z] [INFO] [FILTER] Filter instance created
+[2025-10-03T01:03:03.006Z] [INFO] [FILTER] Product filtering completed | {"totalProducts":10,"originalCount":86878,"filterDate":"2025-10-03T01:03:03.000Z","limit":10}
+[2025-10-03T01:03:03.008Z] [INFO] [FILTER] Sample products displayed | {"sampleCount":3,"products":[{"varenr":"PRODPAM10","beskrivelse":"PRO DP ARMOURING CABLE","maerke_navn":"Vivolink","pris":493.55},{"varenr":"W125783265","beskrivelse":"HIKCENTRAL-P-BI REPORT-MODULE","maerke_navn":"Hikvision","pris":5628},{"varenr":"W126136373","beskrivelse":"Case Insight EU 1y Storage 1TB","maerke_navn":"Axis","pris":7076.25}]}
+[2025-10-03T01:03:03.009Z] [INFO] [APP] EET Shopify Application completed | {"timestamp":"2025-10-03T01:03:03.008Z","stats":{"totalProducts":10,"originalCount":86878,"logFile":"logs\\eet-shopify-2025-10-03.log"}}
