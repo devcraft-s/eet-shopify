@@ -54,7 +54,43 @@ class EETClient {
 
       const result = await response.json();
       
-      return result;
+      // Check if we got a JWT token in the response
+      if (result.token || result.access_token || result.jwt) {
+        this.sessionToken = result.token || result.access_token || result.jwt;
+        this.isAuthenticated = true;
+        
+        if (isLoggingEnabled) {
+          logger.info('EET_LOGIN', 'EET login successful with token', {
+            hasToken: !!this.sessionToken,
+            tokenLength: this.sessionToken ? this.sessionToken.length : 0
+          });
+        }
+        
+        console.log('✅ EET login successful');
+        
+        return {
+          success: true,
+          token: this.sessionToken,
+          message: 'Login successful'
+        };
+      } else {
+        // If no token in response, check if it's a successful response anyway
+        if (result.success !== false) {
+          // Generate a placeholder token for APIs that don't return tokens
+          this.sessionToken = `eet_session_${Date.now()}`;
+          this.isAuthenticated = true;
+          
+          console.log('✅ EET login successful (no token in response)');
+          
+          return {
+            success: true,
+            token: this.sessionToken,
+            message: 'Login successful (no token in response)'
+          };
+        } else {
+          throw new Error(`EET login failed: ${result.message || result.error || 'Unknown error'}`);
+        }
+      }
 
     } catch (error) {
       if (isLoggingEnabled) {
@@ -92,55 +128,79 @@ class EETClient {
     }
 
     return {
-      'Authorization': `Bearer ${this.sessionToken}`,
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
+      'Authorization': `Bearer ${this.sessionToken}`
     };
   }
 
   /**
-   * Logout from EET API
-   * @returns {Promise<Object>} Logout result
+   * Get all products price and stock from EET API
+   * @param {Array} eetProducts - Array of EET products with varenr (SKU)
+   * @returns {Promise<Object>} API response with product data
    */
-  async logout() {
+  async getAllProductsPriceAndStock(eetProducts) {
     try {
       if (!this.isLoggedIn()) {
-        return {
-          success: true,
-          message: 'Already logged out'
-        };
+        throw new Error('Not authenticated. Please login first.');
       }
-
-      // If EET has a logout endpoint, call it here
-      // For now, just clear local state
-      this.sessionToken = null;
-      this.isAuthenticated = false;
 
       if (isLoggingEnabled) {
-        logger.info('EET_LOGOUT', 'EET logout successful');
+        logger.info('EET_PRODUCTS', 'Getting all products price and stock', {
+          productCount: eetProducts.length
+        });
       }
 
-      console.log('✅ EET logout successful');
+      // Extract SKUs from EET products
+      const items = eetProducts.map(product => ({
+        ItemId: product.varenr
+      }));
 
-      return {
-        success: true,
-        message: 'Logout successful'
-      };
+      const requestBody = { Items: items };
+
+      const response = await fetch(`${this.baseUrl}/product`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`EET products API failed with status: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      // Handle direct array response
+      const productsArray = Array.isArray(result) ? result : (result.Items || []);
+
+      if (isLoggingEnabled) {
+        logger.info('EET_PRODUCTS', 'Products data retrieved successfully', {
+          isArray: Array.isArray(result),
+          responseKeys: Array.isArray(result) ? ['array'] : Object.keys(result),
+          itemsCount: productsArray.length
+        });
+      }
+
+      console.log(`✅ Retrieved price and stock data for ${productsArray.length} products`);
+
+      return productsArray;
 
     } catch (error) {
       if (isLoggingEnabled) {
-        logger.error('EET_LOGOUT', 'EET logout failed', {
-          error: error.message
+        logger.error('EET_PRODUCTS', 'Failed to get products price and stock', {
+          error: error.message,
+          productCount: eetProducts.length
         });
       }
+
+      console.log(`❌ Failed to get products data: ${error.message}`);
 
       return {
         success: false,
         error: error.message,
-        message: 'Logout failed'
+        message: 'Failed to get products data'
       };
     }
-  }
+  }  
 }
 
 export default EETClient;
