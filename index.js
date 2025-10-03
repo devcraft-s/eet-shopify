@@ -241,6 +241,79 @@ async function main() {
       }
     }
     
+    // STEP 5: Register unregistered products in Shopify
+    if (unregisteredProducts.length > 0) {
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_REGISTER', 'Starting to register unregistered products', {
+          count: unregisteredProducts.length
+        });
+      }
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors = [];
+      
+      for (const product of unregisteredProducts) {
+        try {
+          const createdProduct = await shopifyClient.createProduct(product);
+          successCount++;
+          
+          if (isLoggingEnabled) {
+            logger.info('SHOPIFY_REGISTER', 'Product registered successfully', {
+              sku: product.variants[0].sku,
+              title: product.title,
+              productId: createdProduct.id,
+              vendor: product.vendor,
+              price: product.variants[0].price
+            });
+          }
+          
+          // Add small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+        } catch (error) {
+          errorCount++;
+          errors.push({
+            sku: product.variants[0].sku,
+            title: product.title,
+            error: error.message
+          });
+          
+          if (isLoggingEnabled) {
+            logger.error('SHOPIFY_REGISTER', 'Product registration failed', {
+              sku: product.variants[0].sku,
+              title: product.title,
+              vendor: product.vendor,
+              price: product.variants[0].price,
+              error: error.message
+            });
+          }
+        }
+      }
+      
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_REGISTER', 'Product registration completed', {
+          totalProducts: unregisteredProducts.length,
+          successCount,
+          errorCount,
+          errors: errors.length > 0 ? errors : undefined
+        });
+      }
+      
+      console.log(`\n🛒 Product Registration Results:`);
+      console.log(`✅ Successfully registered: ${successCount} products`);
+      console.log(`❌ Failed: ${errorCount} products`);
+      
+      if (errors.length > 0) {
+        console.log(`\n❌ Registration Errors:`);
+        errors.forEach(error => {
+          console.log(`  - ${error.sku} (${error.title}): ${error.error}`);
+        });
+      }
+    } else {
+      console.log(`\n✅ All products are already registered in Shopify!`);
+    }
+    
     // Log application completion
     if (isLoggingEnabled) {
       logger.logAppEnd({
