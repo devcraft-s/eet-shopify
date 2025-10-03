@@ -1022,6 +1022,145 @@ class ShopifyClient {
       };
     }
   }
+
+  /**
+   * Update product price only
+   * @param {string} sku - Product SKU to update
+   * @param {number} newPrice - New price in cents (will be converted to decimal)
+   * @param {Array} shopifyProducts - Array of all Shopify products
+   * @returns {Promise<Object>} Update result
+   */
+  async updateProductPrice(sku, newPrice, shopifyProducts) {
+    try {
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_UPDATE_PRICE', 'Starting price update', {
+          sku,
+          newPrice
+        });
+      }
+
+      // Find the product by SKU
+      const product = this.findProductBySKU(sku, shopifyProducts);
+      
+      if (!product) {
+        const error = `Product with SKU ${sku} not found`;
+        if (isLoggingEnabled) {
+          logger.warn('SHOPIFY_UPDATE_PRICE', 'Product not found', { sku });
+        }
+        return { success: false, error };
+      }
+
+      const variant = product.variants.nodes[0];
+      if (!variant) {
+        const error = `No variants found for product ${sku}`;
+        if (isLoggingEnabled) {
+          logger.error('SHOPIFY_UPDATE_PRICE', 'No variants found', { sku, productId: product.id });
+        }
+        return { success: false, error };
+      }
+
+      // Update price if provided
+      if (newPrice !== null && newPrice !== undefined) {
+        try {
+          const priceInDecimal = (newPrice / 100).toFixed(2);
+          
+          const priceUpdateMutation = `
+            mutation {
+              productVariantsBulkUpdate(
+                productId: "${product.id}"
+                variants: {
+                  id: "${variant.id}",
+                  price: "${priceInDecimal}"
+                }
+              ) {
+                userErrors {
+                  code
+                  field
+                  message
+                }
+                productVariants {
+                  id
+                  price
+                }
+              }
+            }
+          `;
+
+          const priceResponse = await this.runGraphQL(priceUpdateMutation);
+          
+          if (priceResponse.data.productVariantsBulkUpdate.userErrors.length > 0) {
+            const errors = priceResponse.data.productVariantsBulkUpdate.userErrors;
+            const errorMessage = `Price update failed: ${errors.map(e => e.message).join(', ')}`;
+            
+            if (isLoggingEnabled) {
+              logger.error('SHOPIFY_UPDATE_PRICE', 'Price update failed', {
+                sku,
+                productId: product.id,
+                errors
+              });
+            }
+            
+            return { success: false, sku, error: errorMessage };
+          } else {
+            if (isLoggingEnabled) {
+              logger.info('SHOPIFY_UPDATE_PRICE', 'Price updated successfully', {
+                sku,
+                productId: product.id,
+                oldPrice: variant.price,
+                newPrice: priceInDecimal
+              });
+            }
+            
+            return {
+              success: true,
+              sku,
+              productId: product.id,
+              oldPrice: variant.price,
+              newPrice: priceInDecimal
+            };
+          }
+        } catch (error) {
+          const errorMessage = `Price update error: ${error.message}`;
+          
+          if (isLoggingEnabled) {
+            logger.error('SHOPIFY_UPDATE_PRICE', 'Price update exception', {
+              sku,
+              productId: product.id,
+              error: error.message
+            });
+          }
+          
+          return { success: false, sku, error: errorMessage };
+        }
+      } else {
+        const error = 'Price not provided';
+        
+        if (isLoggingEnabled) {
+          logger.warn('SHOPIFY_UPDATE_PRICE', 'No price provided', {
+            sku,
+            productId: product.id,
+            price: newPrice
+          });
+        }
+        
+        return { success: false, sku, error };
+      }
+
+    } catch (error) {
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_UPDATE_PRICE', 'Update failed', {
+          sku,
+          error: error.message,
+          stack: error.stack
+        });
+      }
+      return {
+        success: false,
+        sku,
+        error: error.message
+      };
+    }
+  }
 }
 
 export default ShopifyClient;
