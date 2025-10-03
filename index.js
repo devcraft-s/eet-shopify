@@ -60,48 +60,6 @@ function loadShopifyConfig() {
 }
 
 
-/**
- * Get all Shopify products first
- * @returns {Promise<Object>} Object containing products array and shopifyClient
- */
-async function getAllShopifyProducts() {
-  try {
-    if (isLoggingEnabled) {
-      logger.info('SHOPIFY', 'Starting to fetch all Shopify products');
-    }
-    
-    // Load Shopify configuration
-    const shopifyConfig = loadShopifyConfig();
-    const shopifyClient = new ShopifyClient(shopifyConfig);
-    
-    // console.log('🛒 Fetching all Shopify products...');
-    
-    // Get all products from Shopify
-    const allProducts = await shopifyClient.getAllProducts();
-    
-    // console.log(`✅ Successfully fetched ${allProducts.length} products from Shopify`);
-    
-    if (isLoggingEnabled) {
-      logger.info('SHOPIFY', 'All Shopify products fetched successfully', {
-        totalCount: allProducts.length
-      });
-    }
-    
-    return {
-      products: allProducts,
-      client: shopifyClient
-    };
-    
-  } catch (error) {
-    if (isLoggingEnabled) {
-      logger.error('SHOPIFY', 'Failed to fetch Shopify products', {
-        error: error.message,
-        stack: error.stack
-      });
-    }
-    throw error;
-  }
-}
 
 /**
  * Main application entry point
@@ -130,7 +88,22 @@ async function main() {
     }
     
     // STEP 1: Get all Shopify products first
-    const { products: shopifyProducts, client: shopifyClient } = await getAllShopifyProducts();
+    if (isLoggingEnabled) {
+      logger.info('SHOPIFY', 'Starting to fetch all Shopify products');
+    }
+    
+    // Load Shopify configuration
+    const shopifyConfig = loadShopifyConfig();
+    const shopifyClient = new ShopifyClient(shopifyConfig);
+    
+    // Get all products from Shopify
+    const shopifyProducts = await shopifyClient.getAllProducts();
+    
+    if (isLoggingEnabled) {
+      logger.info('SHOPIFY', 'All Shopify products fetched successfully', {
+        totalCount: shopifyProducts.length
+      });
+    }
     
     // Create filter instance
     const filter = new EETProductFilter();
@@ -320,6 +293,9 @@ async function main() {
 
     // STEP 6: Make Shopify products that are not on the EET list into drafts
     const draftResults = await shopifyClient.makeOrphanedProductsDraft(shopifyProducts, jsonData.products);
+
+    // STEP 7: Update price inventory quantity
+    // Run at scheduled intervals
     
     // Log application completion
     if (isLoggingEnabled) {
@@ -356,4 +332,3 @@ main().then(result => {
   console.log("END!");
   process.exit(1);
 }).catch(console.error);
-
