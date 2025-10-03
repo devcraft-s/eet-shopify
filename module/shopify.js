@@ -471,7 +471,7 @@ class ShopifyClient {
                 price: "${adjustedPrice}",
                 id: "${variant.id}",
                 barcode: "${barcode}",
-                inventoryItem: {sku: "${sku}", tracked: false}
+                inventoryItem: {sku: "${sku}", tracked: true}
               }
             ) {
               userErrors {

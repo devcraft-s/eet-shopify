@@ -9,12 +9,9 @@
     ]
   },
   "exclude": {
-    "brand": [
-      "Samsung"
-    ],
+    "brand": [],
     "sku": [
-      "Laptops",
-      "Smartphones"
+      "W127015470"
     ]
   },
   "include_products_limit": 10
