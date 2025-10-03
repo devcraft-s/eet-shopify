@@ -347,7 +347,6 @@ async function startUpdatePriceAndInventoryQuantity(eetProducts) {
       return;
     }
 
-    console.log('✅ EET login successful');
     console.log('🔑 Token received:', loginResult.token ? 'Yes' : 'No');
     if (loginResult.expiration) {
       console.log('⏰ Token expires:', loginResult.expiration);
@@ -357,6 +356,8 @@ async function startUpdatePriceAndInventoryQuantity(eetProducts) {
     console.log('📊 Getting products price and stock data...');
     
     const productsData = await eetClient.getAllProductsPriceAndStock(eetProducts);
+
+    console.log("productsData", productsData);
     
     if (productsData.success === false) {
       console.log('❌ Failed to get products data:', productsData.error);

@@ -82,8 +82,6 @@ class EETClient {
           this.sessionToken = `eet_session_${Date.now()}`;
           this.isAuthenticated = true;
           
-          console.log('✅ EET login successful (no token in response)');
-          
           return {
             success: true,
             token: this.sessionToken,
@@ -158,6 +156,8 @@ class EETClient {
       }));
 
       const requestBody = { Items: items };
+
+      console.log("requestBody", JSON.stringify(requestBody));
 
       const response = await fetch(`${this.baseUrl}/product`, {
         method: 'POST',
