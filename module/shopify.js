@@ -381,6 +381,7 @@ class ShopifyClient {
         }`
       ).join(',') : '';
 
+      // create product mutation
       const mutation = `
         mutation {
           productCreate(
@@ -438,6 +439,74 @@ class ShopifyClient {
       }
 
       const createdProduct = response.data.productCreate.product;
+
+      // Update variant with SKU, barcode, and price
+      if (createdProduct.variants.nodes.length > 0) {
+        const variant = createdProduct.variants.nodes[0];
+        const adjustedPrice = productData.variants[0].price;
+        const barcode = productData.variants[0].barcode || '';
+        const sku = productData.variants[0].sku || '';
+
+        const updateMutation = `
+          mutation {
+            productVariantsBulkUpdate(
+              productId: "${createdProduct.id}"
+              variants: {
+                price: "${adjustedPrice}",
+                id: "${variant.id}",
+                barcode: "${barcode}",
+                inventoryItem: {sku: "${sku}", tracked: false}
+              }
+            ) {
+              userErrors {
+                code
+                field
+                message
+              }
+              productVariants {
+                price
+                barcode
+                id
+              }
+            }
+          }
+        `;
+
+        try {
+          const updateResponse = await this.runGraphQL(updateMutation);
+          console.log("Variant update response:", updateResponse.data.productVariantsBulkUpdate.userErrors);
+
+          if (updateResponse.data.productVariantsBulkUpdate.userErrors.length > 0) {
+            const updateErrors = updateResponse.data.productVariantsBulkUpdate.userErrors;
+            if (isLoggingEnabled) {
+              logger.error('SHOPIFY_UPDATE', 'Variant update failed with user errors', {
+                productId: createdProduct.id,
+                sku: sku,
+                errors: updateErrors
+              });
+            }
+            console.log("Variant update errors:", updateErrors);
+          } else {
+            if (isLoggingEnabled) {
+              logger.info('SHOPIFY_UPDATE', 'Variant updated successfully', {
+                productId: createdProduct.id,
+                sku: sku,
+                price: adjustedPrice,
+                barcode: barcode
+              });
+            }
+          }
+        } catch (updateError) {
+          if (isLoggingEnabled) {
+            logger.error('SHOPIFY_UPDATE', 'Failed to update variant', {
+              productId: createdProduct.id,
+              sku: sku,
+              error: updateError.message
+            });
+          }
+          console.log("Variant update error:", updateError.message);
+        }
+      }
       
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_CREATE', 'Product created successfully', {
