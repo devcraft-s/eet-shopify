@@ -68,59 +68,77 @@ class ShopifyClient {
   }
 
   /**
-   * Check if a product exists by SKU
-   * @param {string} sku - Product SKU
-   * @returns {Promise<Object|null>} Product if exists, null if not
+   * Get all products from Shopify
+   * @param {number} limit - Number of products to fetch (default: 50, max: 250)
+   * @param {string} cursor - Pagination cursor for next page
+   * @returns {Promise<Object>} Products data with pagination info
    */
-  async checkProductExists(sku) {
+  async getAllProducts(limit = 50, cursor = null) {
     try {
-      logger.info('SHOPIFY', 'Checking if product exists', { sku });
+      logger.info('SHOPIFY', 'Getting all products', { limit, hasCursor: !!cursor });
 
       const query = `
-        query getProductBySku($query: String!) {
-          products(first: 1, query: $query) {
+        query getAllProducts($first: Int!, $after: String) {
+          products(first: $first, after: $after) {
             edges {
               node {
                 id
                 title
                 vendor
-                variants(first: 1) {
+                productType
+                status
+                createdAt
+                updatedAt
+                variants(first: 10) {
                   edges {
                     node {
                       id
                       sku
+                      title
                       price
                       inventoryQuantity
+                      inventoryPolicy
                     }
                   }
                 }
               }
+              cursor
+            }
+            pageInfo {
+              hasNextPage
+              hasPreviousPage
+              startCursor
+              endCursor
             }
           }
         }
       `;
 
       const variables = {
-        query: `sku:${sku}`
+        first: Math.min(limit, 250), // Shopify max limit is 250
+        after: cursor
       };
 
       const response = await this.runGraphQL(query, variables);
       
-      if (response.data.products.edges.length > 0) {
-        const product = response.data.products.edges[0].node;
-        logger.info('SHOPIFY', 'Product found', {
-          sku,
-          productId: product.id,
-          title: product.title
-        });
-        return product;
-      } else {
-        logger.info('SHOPIFY', 'Product not found', { sku });
-        return null;
-      }
+      const products = response.data.products.edges.map(edge => edge.node);
+      const pageInfo = response.data.products.pageInfo;
+
+      logger.info('SHOPIFY', 'Products retrieved successfully', {
+        count: products.length,
+        hasNextPage: pageInfo.hasNextPage,
+        hasPreviousPage: pageInfo.hasPreviousPage
+      });
+
+      return {
+        products,
+        pageInfo,
+        totalCount: products.length
+      };
     } catch (error) {
-      logger.error('SHOPIFY', 'Failed to check product existence', {
-        sku,
+      logger.error('SHOPIFY', 'Failed to get all products', {
+        limit,
+        cursor,
         error: error.message
       });
       throw error;
