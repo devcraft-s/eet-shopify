@@ -269,6 +269,7 @@ class ShopifyClient {
                 status
                 variants(first: 10) {
                   nodes {
+                    id
                     barcode
                     price
                     inventoryItem {
