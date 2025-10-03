@@ -1,0 +1,21 @@
+{
+  "include": {
+    "brand": [
+      "Axis",
+      "Hikvision"
+    ],
+    "sku": [
+      "PRODPAM10"
+    ]
+  },
+  "exclude": {
+    "brand": [
+      "Samsung"
+    ],
+    "sku": [
+      "Laptops",
+      "Smartphones"
+    ]
+  },
+  "include_products_limit": 10
+}

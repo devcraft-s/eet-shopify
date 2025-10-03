@@ -1,0 +1,18 @@
+{
+  "name": "eet-shopify",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "filter": "node csvParseAndFilter.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["shopify", "eet", "product-sync", "csv"],
+  "author": "",
+  "license": "ISC",
+  "description": "Shopify custom app for syncing products from EET pricing file",
+  "dependencies": {
+    "csv-parser": "^3.0.0"
+  }
+}
