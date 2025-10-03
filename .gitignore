@@ -4,3 +4,5 @@ eet_prices.txt
 logs/
 tmp_data/
 tmp_data/*
+real-env/
+real-env/*
