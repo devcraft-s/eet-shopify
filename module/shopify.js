@@ -73,12 +73,12 @@ class ShopifyClient {
    * @param {string} cursor - Pagination cursor for next page
    * @returns {Promise<Object>} Products data with pagination info
    */
-  async getAllProducts(limit = 50, cursor = null) {
+  async getProducts(limit = 50, cursor = null) {
     try {
       logger.info('SHOPIFY', 'Getting all products', { limit, hasCursor: !!cursor });
 
       const query = `
-        query getAllProducts($first: Int!, $after: String) {
+        query getProducts($first: Int!, $after: String) {
           products(first: $first, after: $after) {
             edges {
               node {
@@ -139,6 +139,62 @@ class ShopifyClient {
       logger.error('SHOPIFY', 'Failed to get all products', {
         limit,
         cursor,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get ALL products from Shopify by repeatedly executing queries
+   * This will fetch all products regardless of total count
+   * @param {number} batchSize - Number of products per batch (default: 250, max: 250)
+   * @returns {Promise<Array>} Array of all products
+   */
+  async getAllProducts(batchSize = 250) {
+    try {
+      logger.info('SHOPIFY', 'Starting complete product fetch', { batchSize });
+
+      let allProducts = [];
+      let cursor = null;
+      let hasNextPage = true;
+      let batchCount = 0;
+
+      while (hasNextPage) {
+        batchCount++;
+        logger.info('SHOPIFY', `Fetching batch ${batchCount}`, { 
+          batchNumber: batchCount,
+          currentTotal: allProducts.length,
+          hasCursor: !!cursor 
+        });
+
+        const result = await this.getProducts(batchSize, cursor);
+        
+        allProducts = allProducts.concat(result.products);
+        hasNextPage = result.pageInfo.hasNextPage;
+        cursor = result.pageInfo.endCursor;
+
+        logger.info('SHOPIFY', `Batch ${batchCount} completed`, {
+          batchProducts: result.products.length,
+          totalProducts: allProducts.length,
+          hasNextPage
+        });
+
+        // Add small delay to avoid rate limiting
+        if (hasNextPage) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      logger.info('SHOPIFY', 'Complete product fetch finished', {
+        totalBatches: batchCount,
+        totalProducts: allProducts.length
+      });
+
+      return allProducts;
+    } catch (error) {
+      logger.error('SHOPIFY', 'Failed to get all products completely', {
+        batchSize,
         error: error.message
       });
       throw error;
