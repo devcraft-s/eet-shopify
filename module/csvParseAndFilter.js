@@ -225,7 +225,7 @@ class EETProductFilter {
         ? product.web_category_name.substring(0, 17) + '...'
         : product.web_category_name;
 
-      console.log(
+      // console.log(
       //   product.varenr.padEnd(15) +
       //   product.maerke_navn.padEnd(15) +
       //   description.padEnd(40) +
