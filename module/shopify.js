@@ -44,8 +44,8 @@ class ShopifyClient {
       // Convert weight from kg to kg (keep original unit)
       let weightInKg = null;
       let weightUnit = 'KILOGRAMS';
-      if (eetProduct.bruttovægt && eetProduct.bruttovægt > 0) {
-        const weightStr = String(eetProduct.bruttovægt);
+      if (eetProduct.bruttovaegt && eetProduct.bruttovaegt > 0) {
+        const weightStr = String(eetProduct.bruttovaegt);
         const cleanWeight = weightStr.replace(',', '.');
         const weight = parseFloat(cleanWeight);
         if (weight > 0) {
@@ -163,7 +163,7 @@ class ShopifyClient {
       for (const product of existingProducts) {
         if (product.variants && product.variants.nodes) {
           for (const variant of product.variants.nodes) {
-            if (variant.sku === sku) {
+            if (variant.inventoryItem.sku === sku) {
               if (isLoggingEnabled) {
                 logger.info('SHOPIFY_FIND', 'Product found by SKU', {
                   sku,
@@ -270,7 +270,9 @@ class ShopifyClient {
                   nodes {
                     barcode
                     price
-                    sku
+                    inventoryItem {
+                      sku
+                    }
                   }
                 }
               }
@@ -379,7 +381,6 @@ class ShopifyClient {
    * @returns {Promise<Object>} Created product
    */
   async createProduct(productData) {
-    console.log("productData", JSON.stringify(productData));
     try {
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_CREATE', 'Creating new product', {
@@ -482,8 +483,8 @@ class ShopifyClient {
                   tracked: true,
                   measurement: {
                     weight: {
-                      value: "${productData.variants[0].weight}",
-                      unit: "${productData.variants[0].weightUnit}"
+                      value: ${productData.variants[0].weight},
+                      unit: ${productData.variants[0].weightUnit}
                     }
                   }
                 }
