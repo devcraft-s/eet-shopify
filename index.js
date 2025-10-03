@@ -52,87 +52,34 @@ function loadShopifyConfig() {
   }
 }
 
-/**
- * Upload products to Shopify
- * @param {Array} products - Array of EET products
- */
-async function uploadProductsToShopify(products) {
-  try {
-    logger.info('SHOPIFY', 'Starting Shopify upload process', {
-      productCount: products.length
-    });
 
+/**
+ * Get all Shopify products first
+ * @returns {Promise<Array>} Array of all Shopify products
+ */
+async function getAllShopifyProducts() {
+  try {
+    logger.info('SHOPIFY', 'Starting to fetch all Shopify products');
+    
     // Load Shopify configuration
     const shopifyConfig = loadShopifyConfig();
     const shopifyClient = new ShopifyClient(shopifyConfig);
-
-    let successCount = 0;
-    let errorCount = 0;
-    const errors = [];
-
-    // Process each product
-    for (const product of products) {
-      try {
-        logger.info('SHOPIFY', 'Processing product', {
-          sku: product.varenr,
-          title: product.beskrivelse
-        });
-
-        const result = await shopifyClient.uploadProduct(product);
-        successCount++;
-        
-        logger.info('SHOPIFY', 'Product processed successfully', {
-          sku: product.varenr,
-          productId: result.id,
-          title: product.beskrivelse,
-          brand: product.maerke_navn,
-          price: product.pris,
-          stock: product.lagerbeholdning,
-          category: product.web_category_name,
-          action: 'uploaded'
-        });
-
-        // Add small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-      } catch (error) {
-        errorCount++;
-        errors.push({
-          sku: product.varenr,
-          error: error.message
-        });
-        
-        logger.error('SHOPIFY', 'Product upload failed', {
-          sku: product.varenr,
-          title: product.beskrivelse,
-          brand: product.maerke_navn,
-          price: product.pris,
-          error: error.message
-        });
-      }
-    }
-
-    // Log final results
-    logger.info('SHOPIFY', 'Shopify upload process completed', {
-      totalProducts: products.length,
-      successCount,
-      errorCount,
-      errors: errors.length > 0 ? errors : undefined
-    });
-
-    console.log('\n🛒 Shopify Upload Results:');
-    console.log(`✅ Successfully processed: ${successCount} products`);
-    console.log(`❌ Failed: ${errorCount} products`);
     
-    if (errors.length > 0) {
-      console.log('\n❌ Errors:');
-      errors.forEach(error => {
-        console.log(`  - ${error.sku}: ${error.error}`);
-      });
-    }
-
+    console.log('🛒 Fetching all Shopify products...');
+    
+    // Get all products from Shopify
+    const allProducts = await shopifyClient.getAllProducts();
+    
+    console.log(`✅ Successfully fetched ${allProducts.length} products from Shopify`);
+    
+    logger.info('SHOPIFY', 'All Shopify products fetched successfully', {
+      totalCount: allProducts.length
+    });
+    
+    return allProducts;
+    
   } catch (error) {
-    logger.error('SHOPIFY', 'Shopify upload process failed', {
+    logger.error('SHOPIFY', 'Failed to fetch Shopify products', {
       error: error.message,
       stack: error.stack
     });
@@ -142,7 +89,7 @@ async function uploadProductsToShopify(products) {
 
 /**
  * Main application entry point
- * Runs CSV parsing and filtering for EET products
+ * First gets all Shopify products, then runs CSV parsing and filtering for EET products
  */
 async function main() {
   try {
@@ -168,14 +115,21 @@ async function main() {
     console.log('');
     logger.info('APP', 'Application UI started');
     
+    // STEP 1: Get all Shopify products first
+    const shopifyProducts = await getAllShopifyProducts();
+    
+    console.log('\n📋 Shopify Products Summary:');
+    console.log(`📦 Total products in Shopify: ${shopifyProducts.length}`);
+    console.log('');
+    
     // Create filter instance
     const filter = new EETProductFilter();
     logger.info('FILTER', 'Filter instance created');
     
-    // Run the filter with the EET prices file and get JSON data
+    // STEP 2: Run the filter with the EET prices file and get JSON data
     const jsonData = await filter.run(eetPriceFile);
     
-    console.log('\n🎉 Application completed successfully!');
+    console.log('\n🎉 EET Filtering completed successfully!');
     console.log(`📊 Found ${jsonData.metadata.totalProducts} products matching your criteria`);
     console.log(`📈 Original products: ${jsonData.metadata.originalCount}`);
     console.log(`🔍 Filter applied: ${jsonData.metadata.filterDate}`);
@@ -201,18 +155,22 @@ async function main() {
       }))
     });
     
-    // Upload products to Shopify
-    await uploadProductsToShopify(jsonData.products);
+    // STEP 3: Products are ready for further processing
+    // (Upload logic can be implemented separately)
     
     // Log application completion
     logger.logAppEnd({
       totalProducts: jsonData.metadata.totalProducts,
       originalCount: jsonData.metadata.originalCount,
+      shopifyProductsCount: shopifyProducts.length,
       logFile: logger.getCurrentLogFile()
     });
     
     // Return the JSON data for further processing
-    return jsonData;
+    return {
+      shopifyProducts,
+      eetData: jsonData
+    };
     
   } catch (error) {
     logger.error('APP', 'Application failed', {
@@ -225,10 +183,11 @@ async function main() {
 }
 
 // Run the application
-main().then(jsonData => {
-  // You can now use jsonData.products for further processing
-  // For example, send to Shopify API, process in batches, etc.
-  console.log('\n💡 JSON data is ready for further processing!');
-  console.log(`📦 Products array contains ${jsonData.products.length} items`);
+main().then(result => {
+  // You can now use result.shopifyProducts and result.eetData for further processing
+  console.log('\n💡 Data is ready for further processing!');
+  console.log(`🛒 Shopify products: ${result.shopifyProducts.length} items`);
+  console.log(`📦 EET filtered products: ${result.eetData.products.length} items`);
+  console.log(`📊 Total EET products processed: ${result.eetData.metadata.totalProducts}`);
 }).catch(console.error);
 
