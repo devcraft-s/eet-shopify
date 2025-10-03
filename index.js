@@ -169,6 +169,57 @@ async function main() {
       });
     }
     
+    // STEP 4: Extract the list of products not registered in Shopify from eetData
+    const unregisteredProducts = [];
+    const registeredProducts = [];
+    
+    for (const eetProduct of jsonData.products) {
+      const existingProduct = shopifyClient.findProductBySKU(eetProduct.varenr, shopifyProducts);
+      
+      if (existingProduct) {
+        registeredProducts.push({
+          eetProduct,
+          shopifyProduct: existingProduct
+        });
+      } else {
+        unregisteredProducts.push(eetProduct);
+      }
+    }
+    
+    logger.info('PRODUCT_COMPARISON', 'Product comparison completed', {
+      totalEETProducts: jsonData.products.length,
+      registeredInShopify: registeredProducts.length,
+      notRegisteredInShopify: unregisteredProducts.length,
+      shopifyProductsTotal: shopifyProducts.length
+    });
+    
+    // Log sample of unregistered products
+    if (unregisteredProducts.length > 0) {
+      logger.info('UNREGISTERED_PRODUCTS', 'Sample of unregistered products', {
+        count: unregisteredProducts.length,
+        sample: unregisteredProducts.slice(0, 5).map(p => ({
+          varenr: p.varenr,
+          beskrivelse: p.beskrivelse,
+          maerke_navn: p.maerke_navn,
+          pris: p.pris,
+          lagerbeholdning: p.lagerbeholdning
+        }))
+      });
+    }
+    
+    // Log sample of registered products
+    if (registeredProducts.length > 0) {
+      logger.info('REGISTERED_PRODUCTS', 'Sample of registered products', {
+        count: registeredProducts.length,
+        sample: registeredProducts.slice(0, 5).map(rp => ({
+          varenr: rp.eetProduct.varenr,
+          beskrivelse: rp.eetProduct.beskrivelse,
+          shopifyId: rp.shopifyProduct.id,
+          shopifyTitle: rp.shopifyProduct.title
+        }))
+      });
+    }
+    
     // Log application completion
     logger.logAppEnd({
       totalProducts: jsonData.metadata.totalProducts,
@@ -180,7 +231,9 @@ async function main() {
     // Return the JSON data for further processing
     return {
       shopifyProducts,
-      eetData: jsonData
+      eetData: jsonData,
+      unregisteredProducts,
+      registeredProducts
     };
     
   } catch (error) {

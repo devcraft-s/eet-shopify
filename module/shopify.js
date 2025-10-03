@@ -206,15 +206,28 @@ class ShopifyClient {
         : '';
 
       // Convert weight from kg to grams (assuming EET weights are in kg)
-      const weightInGrams = eetProduct.bruttovægt ? parseFloat(eetProduct.bruttovægt) * 1000 : null;
+      let weightInGrams = null;
+      if (eetProduct.bruttovægt) {
+        const weightStr = String(eetProduct.bruttovægt);
+        const cleanWeight = weightStr.replace(',', '.');
+        weightInGrams = parseFloat(cleanWeight) * 1000;
+      }
 
       // Parse price (remove commas and convert to cents)
-      const priceInCents = eetProduct.pris ? 
-        Math.round(parseFloat(eetProduct.pris.replace(',', '.')) * 100) : null;
+      let priceInCents = null;
+      if (eetProduct.pris) {
+        const priceStr = String(eetProduct.pris);
+        const cleanPrice = priceStr.replace(',', '.');
+        priceInCents = Math.round(parseFloat(cleanPrice) * 100);
+      }
 
       // Parse stock quantity
-      const stockQuantity = eetProduct.lagerbeholdning ? 
-        parseInt(parseFloat(eetProduct.lagerbeholdning)) : 0;
+      let stockQuantity = 0;
+      if (eetProduct.lagerbeholdning) {
+        const stockStr = String(eetProduct.lagerbeholdning);
+        const cleanStock = stockStr.replace(',', '.');
+        stockQuantity = parseInt(parseFloat(cleanStock));
+      }
 
       const shopifyProduct = {
         title: eetProduct.beskrivelse || `Product ${eetProduct.varenr}`,
