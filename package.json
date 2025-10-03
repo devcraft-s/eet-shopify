@@ -19,6 +19,7 @@
   "description": "Shopify custom app for syncing products from EET pricing file",
   "dependencies": {
     "csv-parser": "^3.0.0",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "node-fetch": "^3.3.2"
   }
 }
