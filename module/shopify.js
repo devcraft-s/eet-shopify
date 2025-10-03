@@ -14,6 +14,167 @@ class ShopifyClient {
   }
 
   /**
+   * Map EET product data to Shopify product structure
+   * @param {Object} eetProduct - EET product data
+   * @returns {Object} Shopify product structure
+   */
+  mapEETToShopifyProduct(eetProduct) {
+    try {
+      logger.info('SHOPIFY_MAP', 'Mapping EET product to Shopify format', {
+        varenr: eetProduct.varenr,
+        beskrivelse: eetProduct.beskrivelse
+      });
+
+      // Combine descriptions for body HTML
+      const descriptions = [];
+      if (eetProduct.beskrivelse) descriptions.push(eetProduct.beskrivelse);
+      if (eetProduct.beskrivelse_2) descriptions.push(eetProduct.beskrivelse_2);
+      if (eetProduct.beskrivelse_3) descriptions.push(eetProduct.beskrivelse_3);
+      
+      const bodyHtml = descriptions.length > 0 
+        ? `<ul>${descriptions.map(desc => `<li>${desc}</li>`).join('')}</ul>`
+        : '';
+
+      // Convert weight from kg to grams (assuming EET weights are in kg)
+      let weightInGrams = null;
+      if (eetProduct.bruttovægt) {
+        const weightStr = String(eetProduct.bruttovægt);
+        const cleanWeight = weightStr.replace(',', '.');
+        weightInGrams = parseFloat(cleanWeight) * 1000;
+      }
+
+      // Parse price (remove commas and convert to cents)
+      let priceInCents = null;
+      if (eetProduct.pris) {
+        const priceStr = String(eetProduct.pris);
+        const cleanPrice = priceStr.replace(',', '.');
+        priceInCents = Math.round(parseFloat(cleanPrice) * 100);
+      }
+
+      // Parse stock quantity
+      let stockQuantity = 0;
+      if (eetProduct.lagerbeholdning) {
+        const stockStr = String(eetProduct.lagerbeholdning);
+        const cleanStock = stockStr.replace(',', '.');
+        stockQuantity = parseInt(parseFloat(cleanStock));
+      }
+
+      const shopifyProduct = {
+        title: eetProduct.beskrivelse || `Product ${eetProduct.varenr}`,
+        bodyHtml: bodyHtml,
+        vendor: eetProduct.maerke_navn || '',
+        productType: eetProduct.web_category_name || '',
+        tags: [
+          eetProduct.maerke_navn,
+          eetProduct.web_category_name,
+          eetProduct.varenr
+        ].filter(Boolean).join(','),
+        variants: [{
+          sku: eetProduct.varenr,
+          price: priceInCents ? (priceInCents / 100).toFixed(2) : '0.00',
+          weight: weightInGrams,
+          weightUnit: 'GRAMS',
+          barcode: eetProduct.ean_upc || '',
+          inventoryQuantity: stockQuantity,
+          inventoryManagement: 'SHOPIFY'
+        }],
+        metafields: [
+          {
+            namespace: 'streamsupply',
+            key: 'brand',
+            value: eetProduct.maerke_navn || '',
+            type: 'single_line_text_field'
+          },
+          {
+            namespace: 'streamsupply',
+            key: 'mpn',
+            value: eetProduct.manufacturer_part_no || '',
+            type: 'single_line_text_field'
+          },
+          {
+            namespace: 'streamsupply',
+            key: 'incoming_date',
+            value: eetProduct.forventet_levering || '',
+            type: 'date'
+          },
+          {
+            namespace: 'streamsupply',
+            key: 'category_id',
+            value: eetProduct.web_category_id || '',
+            type: 'single_line_text_field'
+          },
+          {
+            namespace: 'streamsupply',
+            key: 'docs',
+            value: eetProduct.item_product_link_web || '',
+            type: 'url'
+          }
+        ].filter(metafield => metafield.value), // Only include metafields with values
+        images: eetProduct.web_picture_url ? [{
+          src: eetProduct.web_picture_url,
+          altText: eetProduct.beskrivelse || `Product ${eetProduct.varenr}`
+        }] : []
+      };
+
+      logger.info('SHOPIFY_MAP', 'EET product mapped successfully', {
+        varenr: eetProduct.varenr,
+        title: shopifyProduct.title,
+        vendor: shopifyProduct.vendor,
+        price: shopifyProduct.variants[0].price,
+        stock: shopifyProduct.variants[0].inventoryQuantity,
+        metafieldsCount: shopifyProduct.metafields.length,
+        hasImage: shopifyProduct.images.length > 0
+      });
+
+      return shopifyProduct;
+    } catch (error) {
+      logger.error('SHOPIFY_MAP', 'Failed to map EET product', {
+        varenr: eetProduct.varenr,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Find product by SKU in existing products
+   * @param {string} sku - Product SKU to search for
+   * @param {Array} existingProducts - Array of existing Shopify products
+   * @returns {Object|null} Found product or null
+   */
+  findProductBySKU(sku, existingProducts) {
+    try {
+      logger.info('SHOPIFY_FIND', 'Searching for product by SKU', { sku });
+
+      // This is a simplified search - in a real implementation, you'd want to query Shopify
+      // for products with specific SKUs using GraphQL
+      for (const product of existingProducts) {
+        if (product.variants && product.variants.edges) {
+          for (const variant of product.variants.edges) {
+            if (variant.node.sku === sku) {
+              logger.info('SHOPIFY_FIND', 'Product found by SKU', {
+                sku,
+                productId: product.id,
+                title: product.title
+              });
+              return product;
+            }
+          }
+        }
+      }
+
+      logger.info('SHOPIFY_FIND', 'Product not found by SKU', { sku });
+      return null;
+    } catch (error) {
+      logger.error('SHOPIFY_FIND', 'Failed to find product by SKU', {
+        sku,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Run any GraphQL query/mutation
    * @param {string} query - GraphQL query or mutation
    * @param {Object} variables - Variables for the query
@@ -184,363 +345,12 @@ class ShopifyClient {
   }
 
   /**
-   * Map EET product data to Shopify product structure
-   * @param {Object} eetProduct - EET product data
-   * @returns {Object} Shopify product structure
-   */
-  mapEETToShopifyProduct(eetProduct) {
-    try {
-      logger.info('SHOPIFY_MAP', 'Mapping EET product to Shopify format', {
-        varenr: eetProduct.varenr,
-        beskrivelse: eetProduct.beskrivelse
-      });
-
-      // Combine descriptions for body HTML
-      const descriptions = [];
-      if (eetProduct.beskrivelse) descriptions.push(eetProduct.beskrivelse);
-      if (eetProduct.beskrivelse_2) descriptions.push(eetProduct.beskrivelse_2);
-      if (eetProduct.beskrivelse_3) descriptions.push(eetProduct.beskrivelse_3);
-      
-      const bodyHtml = descriptions.length > 0 
-        ? `<ul>${descriptions.map(desc => `<li>${desc}</li>`).join('')}</ul>`
-        : '';
-
-      // Convert weight from kg to grams (assuming EET weights are in kg)
-      let weightInGrams = null;
-      if (eetProduct.bruttovægt) {
-        const weightStr = String(eetProduct.bruttovægt);
-        const cleanWeight = weightStr.replace(',', '.');
-        weightInGrams = parseFloat(cleanWeight) * 1000;
-      }
-
-      // Parse price (remove commas and convert to cents)
-      let priceInCents = null;
-      if (eetProduct.pris) {
-        const priceStr = String(eetProduct.pris);
-        const cleanPrice = priceStr.replace(',', '.');
-        priceInCents = Math.round(parseFloat(cleanPrice) * 100);
-      }
-
-      // Parse stock quantity
-      let stockQuantity = 0;
-      if (eetProduct.lagerbeholdning) {
-        const stockStr = String(eetProduct.lagerbeholdning);
-        const cleanStock = stockStr.replace(',', '.');
-        stockQuantity = parseInt(parseFloat(cleanStock));
-      }
-
-      const shopifyProduct = {
-        title: eetProduct.beskrivelse || `Product ${eetProduct.varenr}`,
-        bodyHtml: bodyHtml,
-        vendor: eetProduct.maerke_navn || '',
-        productType: eetProduct.web_category_name || '',
-        tags: [
-          eetProduct.maerke_navn,
-          eetProduct.web_category_name,
-          eetProduct.varenr
-        ].filter(Boolean).join(','),
-        variants: [{
-          sku: eetProduct.varenr,
-          price: priceInCents ? (priceInCents / 100).toFixed(2) : '0.00',
-          weight: weightInGrams,
-          weightUnit: 'GRAMS',
-          barcode: eetProduct.ean_upc || '',
-          inventoryQuantity: stockQuantity,
-          inventoryManagement: 'SHOPIFY'
-        }],
-        metafields: [
-          {
-            namespace: 'streamsupply',
-            key: 'brand',
-            value: eetProduct.maerke_navn || '',
-            type: 'single_line_text_field'
-          },
-          {
-            namespace: 'streamsupply',
-            key: 'mpn',
-            value: eetProduct.manufacturer_part_no || '',
-            type: 'single_line_text_field'
-          },
-          {
-            namespace: 'streamsupply',
-            key: 'incoming_date',
-            value: eetProduct.forventet_levering || '',
-            type: 'date'
-          },
-          {
-            namespace: 'streamsupply',
-            key: 'category_id',
-            value: eetProduct.web_category_id || '',
-            type: 'single_line_text_field'
-          },
-          {
-            namespace: 'streamsupply',
-            key: 'docs',
-            value: eetProduct.item_product_link_web || '',
-            type: 'url'
-          }
-        ].filter(metafield => metafield.value), // Only include metafields with values
-        images: eetProduct.web_picture_url ? [{
-          src: eetProduct.web_picture_url,
-          altText: eetProduct.beskrivelse || `Product ${eetProduct.varenr}`
-        }] : []
-      };
-
-      logger.info('SHOPIFY_MAP', 'EET product mapped successfully', {
-        varenr: eetProduct.varenr,
-        title: shopifyProduct.title,
-        vendor: shopifyProduct.vendor,
-        price: shopifyProduct.variants[0].price,
-        stock: shopifyProduct.variants[0].inventoryQuantity,
-        metafieldsCount: shopifyProduct.metafields.length,
-        hasImage: shopifyProduct.images.length > 0
-      });
-
-      return shopifyProduct;
-    } catch (error) {
-      logger.error('SHOPIFY_MAP', 'Failed to map EET product', {
-        varenr: eetProduct.varenr,
-        error: error.message
-      });
-      throw error;
-    }
-  }
-
-  /**
    * Create a new product in Shopify
    * @param {Object} productData - Shopify product data
    * @returns {Promise<Object>} Created product
    */
   async createProduct(productData) {
-    try {
-      logger.info('SHOPIFY_CREATE', 'Creating new product', {
-        title: productData.title,
-        sku: productData.variants[0]?.sku
-      });
-
-      const mutation = `
-        mutation productCreate($input: ProductInput!) {
-          productCreate(input: $input) {
-            product {
-              id
-              title
-              handle
-              vendor
-              productType
-              tags
-              bodyHtml
-              variants(first: 10) {
-                edges {
-                  node {
-                    id
-                    sku
-                    price
-                    weight
-                    weightUnit
-                    barcode
-                    inventoryQuantity
-                  }
-                }
-              }
-              images(first: 10) {
-                edges {
-                  node {
-                    id
-                    url
-                    altText
-                  }
-                }
-              }
-              metafields(first: 20) {
-                edges {
-                  node {
-                    id
-                    namespace
-                    key
-                    value
-                    type
-                  }
-                }
-              }
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }
-      `;
-
-      const response = await this.runGraphQL(mutation, { input: productData });
-
-      if (response.data.productCreate.userErrors.length > 0) {
-        const errors = response.data.productCreate.userErrors;
-        logger.error('SHOPIFY_CREATE', 'Product creation failed with user errors', {
-          title: productData.title,
-          errors
-        });
-        throw new Error(`Product creation failed: ${errors.map(e => e.message).join(', ')}`);
-      }
-
-      const createdProduct = response.data.productCreate.product;
-      
-      logger.info('SHOPIFY_CREATE', 'Product created successfully', {
-        productId: createdProduct.id,
-        title: createdProduct.title,
-        handle: createdProduct.handle,
-        sku: createdProduct.variants.edges[0]?.node?.sku
-      });
-
-      return createdProduct;
-    } catch (error) {
-      logger.error('SHOPIFY_CREATE', 'Failed to create product', {
-        title: productData.title,
-        error: error.message
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Update an existing product in Shopify
-   * @param {string} productId - Shopify product ID
-   * @param {Object} productData - Updated product data
-   * @returns {Promise<Object>} Updated product
-   */
-  async updateProduct(productId, productData) {
-    try {
-      logger.info('SHOPIFY_UPDATE', 'Updating product', {
-        productId,
-        title: productData.title,
-        sku: productData.variants[0]?.sku
-      });
-
-      const mutation = `
-        mutation productUpdate($input: ProductInput!) {
-          productUpdate(input: $input) {
-            product {
-              id
-              title
-              handle
-              vendor
-              productType
-              tags
-              bodyHtml
-              variants(first: 10) {
-                edges {
-                  node {
-                    id
-                    sku
-                    price
-                    weight
-                    weightUnit
-                    barcode
-                    inventoryQuantity
-                  }
-                }
-              }
-              images(first: 10) {
-                edges {
-                  node {
-                    id
-                    url
-                    altText
-                  }
-                }
-              }
-              metafields(first: 20) {
-                edges {
-                  node {
-                    id
-                    namespace
-                    key
-                    value
-                    type
-                  }
-                }
-              }
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }
-      `;
-
-      const inputData = {
-        ...productData,
-        id: productId
-      };
-
-      const response = await this.runGraphQL(mutation, { input: inputData });
-
-      if (response.data.productUpdate.userErrors.length > 0) {
-        const errors = response.data.productUpdate.userErrors;
-        logger.error('SHOPIFY_UPDATE', 'Product update failed with user errors', {
-          productId,
-          title: productData.title,
-          errors
-        });
-        throw new Error(`Product update failed: ${errors.map(e => e.message).join(', ')}`);
-      }
-
-      const updatedProduct = response.data.productUpdate.product;
-      
-      logger.info('SHOPIFY_UPDATE', 'Product updated successfully', {
-        productId: updatedProduct.id,
-        title: updatedProduct.title,
-        handle: updatedProduct.handle,
-        sku: updatedProduct.variants.edges[0]?.node?.sku
-      });
-
-      return updatedProduct;
-    } catch (error) {
-      logger.error('SHOPIFY_UPDATE', 'Failed to update product', {
-        productId,
-        title: productData.title,
-        error: error.message
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Find product by SKU in existing products
-   * @param {string} sku - Product SKU to search for
-   * @param {Array} existingProducts - Array of existing Shopify products
-   * @returns {Object|null} Found product or null
-   */
-  findProductBySKU(sku, existingProducts) {
-    try {
-      logger.info('SHOPIFY_FIND', 'Searching for product by SKU', { sku });
-
-      // This is a simplified search - in a real implementation, you'd want to query Shopify
-      // for products with specific SKUs using GraphQL
-      for (const product of existingProducts) {
-        if (product.variants && product.variants.edges) {
-          for (const variant of product.variants.edges) {
-            if (variant.node.sku === sku) {
-              logger.info('SHOPIFY_FIND', 'Product found by SKU', {
-                sku,
-                productId: product.id,
-                title: product.title
-              });
-              return product;
-            }
-          }
-        }
-      }
-
-      logger.info('SHOPIFY_FIND', 'Product not found by SKU', { sku });
-      return null;
-    } catch (error) {
-      logger.error('SHOPIFY_FIND', 'Failed to find product by SKU', {
-        sku,
-        error: error.message
-      });
-      throw error;
-    }
+    
   }
 }
 
