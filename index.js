@@ -164,9 +164,6 @@ async function main() {
     const filter = new EETProductFilter();
     logger.info('FILTER', 'Filter instance created');
     
-    // Get EET price file from environment variable
-    const eetPriceFile = process.env.EET_PRICE || 'eet_prices.txt';
-    
     // Run the filter with the EET prices file and get JSON data
     const jsonData = await filter.run(eetPriceFile);
     
