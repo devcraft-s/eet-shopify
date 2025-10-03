@@ -523,6 +523,88 @@ class ShopifyClient {
           console.log("Variant update error:", updateError.message);
         }
       }
+
+      // Update inventory quantity
+      if (createdProduct.variants.nodes.length > 0) {
+        const variant = createdProduct.variants.nodes[0];
+        const inventoryQuantity = productData.variants[0].inventoryQuantity || 0;
+
+        if (variant.inventoryItem && variant.inventoryItem.inventoryLevels.nodes.length > 0) {
+          const inventoryItemId = variant.inventoryItem.id;
+          const locationId = variant.inventoryItem.inventoryLevels.nodes[0].location.id;
+
+          const inventoryMutation = `
+            mutation {
+              inventoryAdjustQuantities(
+                input: {
+                  name: "available",
+                  changes: {
+                    delta: ${inventoryQuantity},
+                    inventoryItemId: "${inventoryItemId}",
+                    locationId: "${locationId}"
+                  },
+                  reason: "restock"
+                }
+              ) {
+                userErrors {
+                  code
+                  field
+                  message
+                }
+                inventoryAdjustmentGroup {
+                  id
+                }
+              }
+            }
+          `;
+
+          try {
+            const inventoryResponse = await this.runGraphQL(inventoryMutation);
+            console.log("Inventory update response:", inventoryResponse.data.inventoryAdjustQuantities.userErrors);
+
+            if (inventoryResponse.data.inventoryAdjustQuantities.userErrors.length > 0) {
+              const inventoryErrors = inventoryResponse.data.inventoryAdjustQuantities.userErrors;
+              if (isLoggingEnabled) {
+                logger.error('SHOPIFY_INVENTORY', 'Inventory update failed with user errors', {
+                  productId: createdProduct.id,
+                  sku: productData.variants[0].sku,
+                  quantity: inventoryQuantity,
+                  errors: inventoryErrors
+                });
+              }
+              console.log("Inventory update errors:", inventoryErrors);
+            } else {
+              if (isLoggingEnabled) {
+                logger.info('SHOPIFY_INVENTORY', 'Inventory updated successfully', {
+                  productId: createdProduct.id,
+                  sku: productData.variants[0].sku,
+                  quantity: inventoryQuantity,
+                  adjustmentGroupId: inventoryResponse.data.inventoryAdjustQuantities.inventoryAdjustmentGroup.id
+                });
+              }
+            }
+          } catch (inventoryError) {
+            if (isLoggingEnabled) {
+              logger.error('SHOPIFY_INVENTORY', 'Failed to update inventory', {
+                productId: createdProduct.id,
+                sku: productData.variants[0].sku,
+                quantity: inventoryQuantity,
+                error: inventoryError.message
+              });
+            }
+            console.log("Inventory update error:", inventoryError.message);
+          }
+        } else {
+          if (isLoggingEnabled) {
+            logger.warn('SHOPIFY_INVENTORY', 'No inventory item or location found for variant', {
+              productId: createdProduct.id,
+              sku: productData.variants[0].sku,
+              hasInventoryItem: !!variant.inventoryItem,
+              hasInventoryLevels: variant.inventoryItem ? variant.inventoryItem.inventoryLevels.nodes.length > 0 : false
+            });
+          }
+        }
+      }
       
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_CREATE', 'Product created successfully', {
