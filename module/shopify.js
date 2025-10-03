@@ -272,6 +272,7 @@ class ShopifyClient {
                     barcode
                     price
                     inventoryItem {
+                      id
                       sku
                       inventoryLevels(first: 10) {
                         nodes {
