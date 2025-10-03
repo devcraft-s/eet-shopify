@@ -625,6 +625,205 @@ class ShopifyClient {
       throw error;
     }
   }
+
+  /**
+   * Make a single product draft
+   * @param {Object} product - Shopify product to make draft
+   * @returns {Promise<Object>} Draft result with success/error info
+   */
+  async makeProductDraft(product) {
+    try {
+      const firstSku = product.variants.nodes[0]?.sku || 'unknown';
+      
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_DRAFT', 'Making product draft', {
+          sku: firstSku,
+          title: product.title,
+          productId: product.id
+        });
+      }
+
+      const draftMutation = `
+        mutation {
+          productUpdate(input: {
+            id: "${product.id}",
+            status: DRAFT
+          }) {
+            userErrors {
+              field
+              message
+            }
+            product {
+              id
+              title
+              status
+            }
+          }
+        }
+      `;
+
+      const draftResponse = await this.runGraphQL(draftMutation);
+
+      if (draftResponse.data.productUpdate.userErrors.length > 0) {
+        const errors = draftResponse.data.productUpdate.userErrors;
+        
+        if (isLoggingEnabled) {
+          logger.error('SHOPIFY_DRAFT', 'Product draft failed with user errors', {
+            sku: firstSku,
+            title: product.title,
+            errors
+          });
+        }
+
+        return {
+          success: false,
+          sku: firstSku,
+          title: product.title,
+          error: errors.map(e => e.message).join(', ')
+        };
+      } else {
+        if (isLoggingEnabled) {
+          logger.info('SHOPIFY_DRAFT', 'Product made draft successfully', {
+            sku: firstSku,
+            title: product.title,
+            productId: product.id
+          });
+        }
+
+        return {
+          success: true,
+          sku: firstSku,
+          title: product.title,
+          productId: product.id
+        };
+      }
+
+    } catch (error) {
+      const firstSku = product.variants.nodes[0]?.sku || 'unknown';
+      
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_DRAFT', 'Failed to make product draft', {
+          sku: firstSku,
+          title: product.title,
+          error: error.message
+        });
+      }
+
+      return {
+        success: false,
+        sku: firstSku,
+        title: product.title,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Make Shopify products that are not in EET list into drafts
+   * @param {Array} shopifyProducts - Array of all Shopify products
+   * @param {Array} eetProducts - Array of EET products
+   * @returns {Promise<Object>} Draft process results
+   */
+  async makeOrphanedProductsDraft(shopifyProducts, eetProducts) {
+    try {
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_DRAFT', 'Starting to identify orphaned products');
+      }
+
+      // Create EET SKU set for fast lookup
+      const eetSkus = new Set(eetProducts.map(p => p.varenr));
+      
+      // Find Shopify products not in EET list
+      const shopifyProductsNotInEET = shopifyProducts.filter(shopifyProduct => {
+        if (shopifyProduct.variants && shopifyProduct.variants.nodes) {
+          return shopifyProduct.variants.nodes.some(variant => 
+            variant.sku && !eetSkus.has(variant.sku)
+          );
+        }
+        return false;
+      });
+
+      if (shopifyProductsNotInEET.length === 0) {
+        console.log(`\n✅ All Shopify products are present in the EET list!`);
+        return {
+          totalProducts: 0,
+          successCount: 0,
+          errorCount: 0,
+          errors: []
+        };
+      }
+
+      console.log(`\n📝 Found ${shopifyProductsNotInEET.length} Shopify products not in EET list`);
+      
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_DRAFT', 'Starting to make products draft', {
+          count: shopifyProductsNotInEET.length
+        });
+      }
+
+      let draftSuccessCount = 0;
+      let draftErrorCount = 0;
+      const draftErrors = [];
+
+      for (const product of shopifyProductsNotInEET) {
+        console.log(`Making draft: ${product.title} (${product.variants.nodes[0]?.sku || 'unknown'})`);
+
+        const result = await this.makeProductDraft(product);
+
+        if (result.success) {
+          draftSuccessCount++;
+          console.log(`✅ Made draft: ${result.title}`);
+        } else {
+          draftErrorCount++;
+          draftErrors.push({
+            sku: result.sku,
+            title: result.title,
+            error: result.error
+          });
+          console.log(`❌ Failed to make draft: ${result.title} - ${result.error}`);
+        }
+
+        // Add small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_DRAFT', 'Draft process completed', {
+          totalProducts: shopifyProductsNotInEET.length,
+          successCount: draftSuccessCount,
+          errorCount: draftErrorCount,
+          errors: draftErrors.length > 0 ? draftErrors : undefined
+        });
+      }
+
+      console.log(`\n📝 Draft Process Results:`);
+      console.log(`✅ Successfully made draft: ${draftSuccessCount} products`);
+      console.log(`❌ Failed to make draft: ${draftErrorCount} products`);
+
+      if (draftErrors.length > 0) {
+        console.log(`\n❌ Draft Errors:`);
+        draftErrors.forEach(error => {
+          console.log(`  - ${error.sku} (${error.title}): ${error.error}`);
+        });
+      }
+
+      return {
+        totalProducts: shopifyProductsNotInEET.length,
+        successCount: draftSuccessCount,
+        errorCount: draftErrorCount,
+        errors: draftErrors
+      };
+
+    } catch (error) {
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_DRAFT', 'Draft process failed', {
+          error: error.message,
+          stack: error.stack
+        });
+      }
+      throw error;
+    }
+  }
 }
 
 export default ShopifyClient;
