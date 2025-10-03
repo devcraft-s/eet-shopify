@@ -2,21 +2,53 @@ import EETProductFilter from './module/csvParseAndFilter.js';
 import logger from './module/logger.js';
 import ShopifyClient from './module/shopify.js';
 import fs from 'fs';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 /**
- * Load Shopify configuration
+ * Load Shopify configuration from environment variables
  * @returns {Object} Shopify configuration
  */
 function loadShopifyConfig() {
   try {
-    const configData = fs.readFileSync('config/shopify-config.json', 'utf8');
-    return JSON.parse(configData);
+    const production = process.env.PRODUCTION || 'development';
+    
+    let shopDomain, accessToken;
+    
+    if (production === 'development') {
+      shopDomain = process.env.SHOPIFY_TEST_STORE_ADMIN_URL;
+      accessToken = process.env.SHOPIFY_TEST_STORE_ADMIN_API;
+    } else {
+      // For production, you can add production environment variables here
+      shopDomain = process.env.SHOPIFY_PRODUCTION_STORE_ADMIN_URL;
+      accessToken = process.env.SHOPIFY_PRODUCTION_STORE_ADMIN_API;
+    }
+
+    if (!shopDomain || !accessToken) {
+      throw new Error(`Missing Shopify configuration for ${production} environment`);
+    }
+
+    const config = {
+      shopDomain,
+      accessToken,
+      apiVersion: '2024-01'
+    };
+
+    logger.info('CONFIG', 'Shopify configuration loaded', {
+      environment: production,
+      shopDomain: shopDomain.replace(/\.myshopify\.com$/, ''),
+      hasAccessToken: !!accessToken
+    });
+
+    return config;
   } catch (error) {
     logger.error('CONFIG', 'Failed to load Shopify config', {
       error: error.message,
-      file: 'config/shopify-config.json'
+      production: process.env.PRODUCTION
     });
-    throw new Error('Shopify configuration not found. Please create config/shopify-config.json');
+    throw new Error(`Shopify configuration error: ${error.message}`);
   }
 }
 
@@ -109,16 +141,34 @@ async function main() {
     // Log application start
     logger.logAppStart();
     
+    // Log environment configuration
+    const production = process.env.PRODUCTION || 'development';
+    const language = process.env.LANGUAGE || 'EN';
+    const eetPriceFile = process.env.EET_PRICE || 'eet_prices.txt';
+    
+    logger.info('CONFIG', 'Environment configuration loaded', {
+      production,
+      language,
+      eetPriceFile
+    });
+    
     console.log('🚀 Starting EET Product Filter Application');
     console.log('═'.repeat(60));
+    console.log(`🌍 Environment: ${production}`);
+    console.log(`🗣️  Language: ${language}`);
+    console.log(`📁 EET Price File: ${eetPriceFile}`);
+    console.log('');
     logger.info('APP', 'Application UI started');
     
     // Create filter instance
     const filter = new EETProductFilter();
     logger.info('FILTER', 'Filter instance created');
     
+    // Get EET price file from environment variable
+    const eetPriceFile = process.env.EET_PRICE || 'eet_prices.txt';
+    
     // Run the filter with the EET prices file and get JSON data
-    const jsonData = await filter.run('eet_prices.txt');
+    const jsonData = await filter.run(eetPriceFile);
     
     console.log('\n🎉 Application completed successfully!');
     console.log(`📊 Found ${jsonData.metadata.totalProducts} products matching your criteria`);
