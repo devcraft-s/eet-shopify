@@ -102,7 +102,7 @@ class EETProductFilter {
 
       // Parse numeric values
       const price = parseFloat(cleanRow.pris?.replace(',', '.') || '0');
-      const stock = parseFloat(cleanRow.lagerbeholdning?.replace(',', '.') || '0');
+      const stock = parseInt(cleanRow.lagerbeholdning?.replace(',', '.') || '0'); // parse as integer
       const grossWeight = parseFloat(cleanRow.bruttovaegt?.replace(',', '.') || '0');
       const netWeight = parseFloat(cleanRow.nettovaegt?.replace(',', '.') || '0');
 
@@ -139,6 +139,14 @@ class EETProductFilter {
     // console.log('🔍 Applying filters...');
     
     let filteredProducts = products;
+
+    // Remove products with zero stock
+    const beforeStockFilter = filteredProducts.length;
+    filteredProducts = filteredProducts.filter(product => product.lagerbeholdning > 0);
+    const removedZeroStock = beforeStockFilter - filteredProducts.length;
+    if (removedZeroStock > 0) {
+      // console.log(`📦 Removed ${removedZeroStock} products with zero stock: ${filteredProducts.length} products remaining`);
+    }
 
     // Apply include filters - use OR logic for include filters
     if (this.filterConfig.include) {
