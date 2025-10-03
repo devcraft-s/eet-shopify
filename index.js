@@ -355,12 +355,12 @@ async function startUpdatePriceAndInventoryQuantity(eetProducts) {
     // STEP 2: Get all products price and stock from EET
     console.log('📊 Getting products price and stock data...');
     
-    const productsData = await eetClient.getAllProductsPriceAndStock(eetProducts);
+    const eetPriceAndStock = await eetClient.getAllProductsPriceAndStock(eetProducts);
 
-    console.log("productsData", productsData);
+    console.log("eetPriceAndStock", eetPriceAndStock);
     
-    if (productsData.success === false) {
-      console.log('❌ Failed to get products data:', productsData.error);
+    if (eetPriceAndStock.success === false) {
+      console.log('❌ Failed to get products data:', eetPriceAndStock.error);
       return;
     }
 
@@ -368,24 +368,24 @@ async function startUpdatePriceAndInventoryQuantity(eetProducts) {
     
     if (isLoggingEnabled) {
       logger.info('EET_UPDATE', 'Products data retrieved', {
-        itemsCount: productsData.length,
-        sampleItems: productsData.slice(0, 3)
+        itemsCount: eetPriceAndStock.length,
+        sampleItems: eetPriceAndStock.slice(0, 3)
       });
     }
 
     // STEP 3: Process the data and update Shopify products
-    if (productsData && productsData.length > 0) {
-      console.log(`📈 Processing ${productsData.length} products for price/inventory updates`);
+    if (eetPriceAndStock && eetPriceAndStock.length > 0) {
+      console.log(`📈 Processing ${eetPriceAndStock.length} products for price/inventory updates`);
       
       // Log sample data for debugging
       console.log('Sample EET API data:');
-      productsData.slice(0, 2).forEach(item => {
+      eetPriceAndStock.slice(0, 2).forEach(item => {
         console.log(`  - ${item.ItemId}: Price=${item.Price?.Price || 'N/A'}, Stock=${item.Stock?.length || 0} locations`);
       });
       
       if (isLoggingEnabled) {
         logger.info('EET_UPDATE', 'Price and inventory update process completed', {
-          processedCount: productsData.length
+          processedCount: eetPriceAndStock.length
         });
       }
     }
