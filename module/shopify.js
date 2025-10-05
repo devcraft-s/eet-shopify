@@ -884,7 +884,7 @@ class ShopifyClient {
       }
 
       // Update inventory if provided
-      if (newQuantity !== null && newQuantity !== undefined && variant.inventoryItem) {
+      if (newQuantity !== null && newQuantity !== undefined && variant.inventoryItem && variant.inventoryQuantity !== newQuantity) {
         try {
           if (variant.inventoryItem.inventoryLevels.nodes.length > 0) {
             // inventoryQuantity = old quantity - new quantity
@@ -1042,9 +1042,9 @@ class ShopifyClient {
       }
 
       // Update price if provided
-      if (newPrice !== null && newPrice !== undefined) {
+      if (newPrice !== null && newPrice !== undefined && variant.price !== newPrice) {
         try {
-          const priceInDecimal = (newPrice / 100).toFixed(2);
+          const priceInDecimal = (newPrice).toFixed(2);
           
           const priceUpdateMutation = `
             mutation {
@@ -1141,6 +1141,70 @@ class ShopifyClient {
         sku,
         error: error.message
       };
+    }
+  }
+
+  /**
+   * 
+   */
+  async updateStockObject(sku, stockObject, product) {
+    try {
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_UPDATE_STOCK_OBJECT', 'Starting stock object update', {
+          sku,
+          stockObject
+        });
+      }
+
+      if (!product) {
+        const error = `Product with SKU ${sku} not found`;
+        if (isLoggingEnabled) {
+          logger.warn('SHOPIFY_UPDATE_STOCK_OBJECT', 'Product not found', { sku });
+        }
+        return { success: false, error };
+      }
+
+      const stockObjectMutation = `
+        mutation MyMutation {
+          productUpdate(
+            product: {
+              metafields: {
+              key: "stock_object",
+              namespace: "streamsupply",
+              value: "${JSON.stringify(stockObject)}"},
+              id: "${product.id}"
+            }
+          ) {
+            product {
+              id
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const stockObjectResponse = await this.runGraphQL(stockObjectMutation);
+
+      if (stockObjectResponse.data.productUpdate.userErrors.length > 0) {
+        const errors = stockObjectResponse.data.productUpdate.userErrors;
+        const errorMessage = `Stock object update failed: ${errors.map(e => e.message).join(', ')}`;
+        return { success: false, sku, error: errorMessage };
+      } else {
+        return { success: true, sku };
+      }
+
+    } catch (error) {
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_UPDATE_STOCK_OBJECT', 'Update failed', {
+          sku,
+          error: error.message,
+          stack: error.stack
+        });
+      }
+      return { success: false, sku, error: error.message };
     }
   }
 }
