@@ -272,6 +272,7 @@ class ShopifyClient {
                     id
                     barcode
                     price
+                    inventoryQuantity
                     inventoryItem {
                       id
                       sku
@@ -856,7 +857,7 @@ class ShopifyClient {
    * @param {Array} shopifyProducts - Array of all Shopify products
    * @returns {Promise<Object>} Update result
    */
-  async updateProductInventory(sku, newQuantity, shopifyProducts) {
+  async updateProductQuantity(sku, newQuantity, shopifyProducts) {
     try {
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_UPDATE_INVENTORY', 'Starting inventory update', {
@@ -889,7 +890,11 @@ class ShopifyClient {
       if (newQuantity !== null && newQuantity !== undefined && variant.inventoryItem) {
         try {
           if (variant.inventoryItem.inventoryLevels.nodes.length > 0) {
-            const inventoryQuantity = newQuantity;
+            // inventoryQuantity = old quantity - new quantity
+            const oldQuantity = variant.inventoryQuantity;
+            const inventoryQuantity = newQuantity - oldQuantity;
+
+            console.log("inventoryQuantity", inventoryQuantity, "-------------------------", oldQuantity);
 
             const inventoryMutation = `
               mutation {

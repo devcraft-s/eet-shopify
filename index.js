@@ -283,6 +283,8 @@ async function main() {
 
     if (loginResult.success) {
       const eetPriceAndStock = await eetClient.getAllProductsPriceAndStock(jsonData.products);
+
+      console.log("eetPriceAndStock", JSON.stringify(eetPriceAndStock));
       
       if (eetPriceAndStock && eetPriceAndStock.length > 0) {
         let successCount = 0;
@@ -291,7 +293,13 @@ async function main() {
         for (const eetItem of eetPriceAndStock) {
           try {
             const sku = eetItem.ItemId;
-            const price = eetItem.Price?.Price || null;
+
+            // if eetItem.Price is not empty
+            // price = eetItem.Price.Price + eetItem.Price.VatAmount
+            let price = null;
+            if (eetItem.Price) {
+              price = parseFloat(eetItem.Price.Price) + parseFloat(eetItem.Price.VatAmount);
+            }
 
             if (price !== null) {
               const result = await shopifyClient.updateProductPrice(sku, price, shopifyProducts);
@@ -301,6 +309,33 @@ async function main() {
               } else {
                 errorCount++;
                 console.log(`❌ Failed ${sku}: ${result.error}`);
+              }
+            }
+
+            // update quantity
+            let stockObject = null;
+            if (eetItem.Stock) {
+              stockObject = eetItem.Stock;
+            }
+            if (stockObject.length > 0) {
+              let localStock = 0;
+              let remoteStock = 0;
+              let incomingStock = 0;
+              stockObject.forEach(stock => {
+                if (stock.StockTypeName === "Local") {
+                  localStock = stock.Quantity;
+                } else if (stock.StockTypeName === "Remote") {
+                  remoteStock = stock.Quantity;
+                } else if (stock.StockTypeName === "Incoming") {
+                  incomingStock = stock.Quantity;
+                }
+              });
+              const quantityResult = await shopifyClient.updateProductQuantity(sku, parseInt(localStock) + parseInt(remoteStock), shopifyProducts);
+            } else {
+              // make product draft
+              const product = shopifyClient.findProductBySKU(sku, shopifyProducts);
+              if (product) {
+                await shopifyClient.makeProductDraft(product);
               }
             }
 
