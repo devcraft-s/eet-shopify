@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
+    "start:scheduled": "SCHEDULED_MODE=true node index.js",
     "filter": "node csvParseAndFilter.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon index.js"

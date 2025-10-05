@@ -390,7 +390,48 @@ async function main() {
   }
 }
 
-// Run the application
-main().then(result => {
-  console.log("END!");
-}).catch(console.error);
+/**
+ * Schedule the main process to run every 12 hours
+ */
+function scheduleProcess() {
+  const runProcess = async () => {
+    const startTime = new Date();
+    console.log(`\n🕐 Starting scheduled process at ${startTime.toISOString()}`);
+    console.log('═'.repeat(80));
+    
+    try {
+      await main();
+      const endTime = new Date();
+      const duration = Math.round((endTime - startTime) / 1000);
+      console.log(`\n✅ Process completed successfully at ${endTime.toISOString()}`);
+      console.log(`⏱️  Duration: ${duration} seconds`);
+    } catch (error) {
+      const endTime = new Date();
+      console.error(`\n❌ Process failed at ${endTime.toISOString()}:`, error.message);
+    }
+    
+    // Schedule next run in 12 hours
+    const nextRun = new Date(Date.now() + 12 * 60 * 60 * 1000);
+    console.log(`\n⏰ Next scheduled run: ${nextRun.toISOString()}`);
+    console.log('═'.repeat(80));
+    
+    setTimeout(runProcess, 12 * 60 * 60 * 1000); // 12 hours = 12 * 60 * 60 * 1000 ms
+  };
+  
+  // Start the first run immediately
+  runProcess();
+}
+
+// Check if we should run in scheduled mode or single run
+const isScheduledMode = process.env.SCHEDULED_MODE === 'true';
+
+if (isScheduledMode) {
+  console.log('🔄 Starting in scheduled mode - will run every 12 hours');
+  scheduleProcess();
+} else {
+  console.log('🚀 Starting in single-run mode');
+  // Run the application once
+  main().then(result => {
+    console.log("END!");
+  }).catch(console.error);
+}
