@@ -93,6 +93,7 @@ class ShopifyClient {
    * @returns {Promise<Object>} Shopify product structure
    */
   async mapEETToShopifyProduct(eetProduct) {
+    console.log(eetProduct);
     try {
       logger.info('SHOPIFY_MAP', 'Mapping EET product to Shopify format', {
         varenr: eetProduct.varenr,
@@ -139,13 +140,13 @@ class ShopifyClient {
 
       // Scrape document URLs from product page
       let documentUrls = [];
-      if (eetProduct.item_product_link_web) {
+      if (eetProduct.item_product_link) {
         try {
-          documentUrls = await this.scrapeProductDocuments(eetProduct.item_product_link_web);
+          documentUrls = await this.scrapeProductDocuments(eetProduct.item_product_link);
         } catch (error) {
           logger.warn('SHOPIFY_MAP', 'Failed to scrape documents', {
             varenr: eetProduct.varenr,
-            productUrl: eetProduct.item_product_link_web,
+            productUrl: eetProduct.item_product_link,
             error: error.message
           });
         }
@@ -198,7 +199,7 @@ class ShopifyClient {
           {
             namespace: 'streamsupply',
             key: 'docs',
-            value: eetProduct.item_product_link_web || '',
+            value: eetProduct.item_product_link || '',
             type: 'url'
           },
           {
