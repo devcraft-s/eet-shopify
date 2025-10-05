@@ -857,7 +857,7 @@ class ShopifyClient {
    * @param {Array} shopifyProducts - Array of all Shopify products
    * @returns {Promise<Object>} Update result
    */
-  async updateProductQuantity(sku, newQuantity, shopifyProducts) {
+  async updateProductQuantity(sku, newQuantity, product) {
     try {
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_UPDATE_INVENTORY', 'Starting inventory update', {
@@ -865,9 +865,6 @@ class ShopifyClient {
           newQuantity
         });
       }
-
-      // Find the product by SKU
-      const product = this.findProductBySKU(sku, shopifyProducts);
       
       if (!product) {
         const error = `Product with SKU ${sku} not found`;
@@ -1018,7 +1015,7 @@ class ShopifyClient {
    * @param {Array} shopifyProducts - Array of all Shopify products
    * @returns {Promise<Object>} Update result
    */
-  async updateProductPrice(sku, newPrice, shopifyProducts) {
+  async updateProductPrice(sku, newPrice, product) {
     try {
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_UPDATE_PRICE', 'Starting price update', {
@@ -1026,9 +1023,6 @@ class ShopifyClient {
           newPrice
         });
       }
-
-      // Find the product by SKU
-      const product = this.findProductBySKU(sku, shopifyProducts);
       
       if (!product) {
         const error = `Product with SKU ${sku} not found`;

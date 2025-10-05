@@ -293,6 +293,7 @@ async function main() {
         for (const eetItem of eetPriceAndStock) {
           try {
             const sku = eetItem.ItemId;
+            const product = shopifyClient.findProductBySKU(sku, shopifyProducts);
 
             // if eetItem.Price is not empty
             // price = eetItem.Price.Price + eetItem.Price.VatAmount
@@ -302,7 +303,7 @@ async function main() {
             }
 
             if (price !== null) {
-              const result = await shopifyClient.updateProductPrice(sku, price, shopifyProducts);
+              const result = await shopifyClient.updateProductPrice(sku, price, product);
 
               if (result.success) {
                 successCount++;
@@ -330,10 +331,9 @@ async function main() {
                   incomingStock = stock.Quantity;
                 }
               });
-              const quantityResult = await shopifyClient.updateProductQuantity(sku, parseInt(localStock) + parseInt(remoteStock), shopifyProducts);
+              const quantityResult = await shopifyClient.updateProductQuantity(sku, parseInt(localStock) + parseInt(remoteStock), product);
             } else {
               // make product draft
-              const product = shopifyClient.findProductBySKU(sku, shopifyProducts);
               if (product) {
                 await shopifyClient.makeProductDraft(product);
               }
