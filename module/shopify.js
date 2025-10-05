@@ -203,10 +203,10 @@ class ShopifyClient {
    */
   async runGraphQL(query, variables = {}) {
     try {
-      logger.info('SHOPIFY_GRAPHQL', 'Executing GraphQL query', {
-        query: query.substring(0, 200) + '...',
-        variables
-      });
+      // logger.info('SHOPIFY_GRAPHQL', 'Executing GraphQL query', {
+      //   query: query.substring(0, 200) + '...',
+      //   variables
+      // });
 
       const response = await fetch(this.apiUrl, {
         method: 'POST',
@@ -769,7 +769,7 @@ class ShopifyClient {
         
         if (shopifyProduct.variants && shopifyProduct.variants.nodes) {
           return shopifyProduct.variants.nodes.some(variant => 
-            variant.sku && !eetSkus.has(variant.sku)
+            variant.inventoryItem && variant.inventoryItem.sku && !eetSkus.has(variant.inventoryItem.sku)
           );
         }
         return false;
