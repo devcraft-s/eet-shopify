@@ -1044,7 +1044,7 @@ class ShopifyClient {
       // Update price if provided
       if (newPrice !== null && newPrice !== undefined && variant.price !== newPrice) {
         try {
-          const priceInDecimal = (newPrice).toFixed(2);
+          const priceInDecimal = (newPrice / 100).toFixed(2);
           
           const priceUpdateMutation = `
             mutation {
@@ -1165,13 +1165,14 @@ class ShopifyClient {
       }
 
       const stockObjectMutation = `
-        mutation MyMutation {
+        mutation productUpdate {
           productUpdate(
             product: {
               metafields: {
-              key: "stock_object",
-              namespace: "streamsupply",
-              value: "${JSON.stringify(stockObject)}"},
+                key: "stock_object",
+                namespace: "streamsupply",
+                value: "${JSON.stringify(stockObject).replace(/"/g, '\\"')}"
+              },
               id: "${product.id}"
             }
           ) {

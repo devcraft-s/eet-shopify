@@ -332,7 +332,6 @@ async function main() {
                 }
               });
               const quantityResult = await shopifyClient.updateProductQuantity(sku, parseInt(localStock) + parseInt(remoteStock), product);
-
               const saveStockObject = await shopifyClient.updateStockObject(sku, eetItem.Stock, product);
             } else {
               // make product draft
