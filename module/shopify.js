@@ -29,62 +29,252 @@ class ShopifyClient {
   async scrapeProductDocuments(productUrl) {
     try {
       if (!productUrl) {
-        logger.warn('SHOPIFY_SCRAPE', 'No product URL provided for document scraping');
+        console.log('❌ No product URL provided for document scraping');
         return [];
       }
 
-      logger.info('SHOPIFY_SCRAPE', 'Starting document scraping', { productUrl });
+      console.log('🔍 Starting document scraping for URL:', productUrl);
 
       const response = await fetch(productUrl, {
+        method: 'GET',
+        redirect: 'follow',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1'
         }
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.log('❌ HTTP error! status:', response.status);
+        return [];
       }
 
+      const finalUrl = response.url;
+      console.log('✅ Redirect successful:');
+      console.log('   Original URL:', productUrl);
+      console.log('   Final URL:', finalUrl);
+      
       const html = await response.text();
-      const $ = cheerio.load(html);
+      let $ = cheerio.load(html);
+      
+      console.log('📄 Page loaded successfully:');
+      console.log('   Title:', $('title').text());
+      console.log('   HTML length:', html.length);
+      console.log('   Total links found:', $('a').length);
       
       const pdfUrls = [];
       
-      // Search for PDF links in various ways
-      $('a[href*=".pdf"]').each((index, element) => {
-        const href = $(element).attr('href');
-        if (href && href.includes('.pdf')) {
-          // Convert relative URLs to absolute URLs
-          const absoluteUrl = href.startsWith('http') ? href : new URL(href, productUrl).href;
+      // First attempt - immediate search
+      console.log('🔄 First attempt - immediate search...');
+      const firstAttemptResults = await this.searchForDocuments($, finalUrl);
+      pdfUrls.push(...firstAttemptResults);
+      
+      // If no documents found, wait and try again (for slow-loading content)
+      if (pdfUrls.length === 0) {
+        console.log('⏳ No documents found in first attempt, waiting 3 seconds for dynamic content...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Re-fetch the page to get updated content
+        console.log('🔄 Second attempt - re-fetching page...');
+        const retryResponse = await fetch(finalUrl, {
+          method: 'GET',
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
+          }
+        });
+        
+        if (retryResponse.ok) {
+          const retryHtml = await retryResponse.text();
+          $ = cheerio.load(retryHtml);
+          console.log('📄 Page re-fetched successfully:');
+          console.log('   HTML length:', retryHtml.length);
+          console.log('   Total links found:', $('a').length);
+          
+          const secondAttemptResults = await this.searchForDocuments($, finalUrl);
+          pdfUrls.push(...secondAttemptResults);
+        }
+      }
+      
+      // If still no documents, try one more time with longer wait
+      if (pdfUrls.length === 0) {
+        console.log('⏳ Still no documents found, waiting 5 more seconds...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        console.log('🔄 Third attempt - final search...');
+        const thirdAttemptResults = await this.searchForDocuments($, finalUrl);
+        pdfUrls.push(...thirdAttemptResults);
+      }
+      
+      // Remove duplicates and return
+      const uniquePdfUrls = [...new Set(pdfUrls)];
+      
+      console.log('📊 Scraping Results:');
+      console.log('   Total PDFs found (before deduplication):', pdfUrls.length);
+      console.log('   Unique PDFs found:', uniquePdfUrls.length);
+      console.log('   PDF URLs:', uniquePdfUrls);
+      
+      return uniquePdfUrls;
+    } catch (error) {
+      console.log('❌ Error during document scraping:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Helper method to search for documents in the parsed HTML
+   * @param {Object} $ - Cheerio instance
+   * @param {string} finalUrl - Final URL after redirects
+   * @returns {Array} Array of found PDF URLs
+   */
+  async searchForDocuments($, finalUrl) {
+    const pdfUrls = [];
+    
+    // Search specifically in the documents container
+    console.log('🔍 Searching in #documents container...');
+    const documentsContainer = $('#documents');
+    console.log('   Documents container found:', documentsContainer.length > 0);
+    
+    $('#documents a[href*=".pdf"]').each((index, element) => {
+      const href = $(element).attr('href');
+      if (href && href.includes('.pdf')) {
+        console.log('   ✅ Found PDF in documents container:', href);
+        pdfUrls.push(href);
+      }
+    });
+
+    // Search for specific EET document pattern in documents container
+    console.log('🔍 Searching for EET document pattern in documents container...');
+    $('#documents a[href*="product-images.eetgroup.com/documents/Doc_"]').each((index, element) => {
+      const href = $(element).attr('href');
+      if (href && href.includes('product-images.eetgroup.com/documents/Doc_')) {
+        console.log('   ✅ Found EET document in documents container:', href);
+        pdfUrls.push(href);
+      }
+    });
+
+    // Fallback: Search for PDF links anywhere on the page
+    console.log('🔍 Fallback: Searching for PDF links anywhere on the page...');
+    $('a[href*=".pdf"]').each((index, element) => {
+      const href = $(element).attr('href');
+      if (href && href.includes('.pdf')) {
+        const absoluteUrl = href.startsWith('http') ? href : new URL(href, finalUrl).href;
+        console.log('   ✅ Found PDF anywhere on page:', absoluteUrl);
+        pdfUrls.push(absoluteUrl);
+      }
+    });
+
+    // Search in article elements that might contain documents
+    console.log('🔍 Searching in article elements...');
+    const articleElements = $('article[id="documents"], article:contains("Dokumenter"), article:contains("Documents")');
+    console.log('   Article elements found:', articleElements.length);
+    
+    articleElements.find('a[href*=".pdf"]').each((index, element) => {
+      const href = $(element).attr('href');
+      if (href && href.includes('.pdf')) {
+        console.log('   ✅ Found PDF in article element:', href);
+        pdfUrls.push(href);
+      }
+    });
+
+    // Search for any links containing "documents" or "docs"
+    console.log('🔍 Searching for links containing "documents" or "docs"...');
+    $('a[href*="documents"], a[href*="docs"]').each((index, element) => {
+      const href = $(element).attr('href');
+      if (href && (href.includes('documents') || href.includes('docs'))) {
+        const absoluteUrl = href.startsWith('http') ? href : new URL(href, finalUrl).href;
+        if (absoluteUrl.includes('.pdf') || absoluteUrl.includes('Doc_')) {
+          console.log('   ✅ Found document link:', absoluteUrl);
+          pdfUrls.push(absoluteUrl);
+        }
+      }
+    });
+
+    // Search in script tags for PDF URLs
+    console.log('🔍 Searching in script tags...');
+    $('script').each((index, element) => {
+      const scriptContent = $(element).html();
+      if (scriptContent) {
+        const pdfMatches = scriptContent.match(/https?:\/\/[^\s"']+\.pdf/gi);
+        if (pdfMatches) {
+          pdfMatches.forEach(match => {
+            console.log('   ✅ Found PDF in script:', match);
+            pdfUrls.push(match);
+          });
+        }
+      }
+    });
+
+    // Fallback: Search in raw HTML content for any PDF URLs
+    console.log('🔍 Searching in raw HTML content...');
+    const html = $.html();
+    const rawPdfMatches = html.match(/https?:\/\/[^\s"']*\.pdf/gi);
+    if (rawPdfMatches) {
+      rawPdfMatches.forEach(match => {
+        console.log('   ✅ Found PDF in raw HTML:', match);
+        pdfUrls.push(match);
+      });
+    }
+
+    // Search for EET-specific document patterns in raw HTML
+    console.log('🔍 Searching for EET document patterns in raw HTML...');
+    const eetDocMatches = html.match(/https?:\/\/[^\s"']*product-images\.eetgroup\.com[^\s"']*Doc_[^\s"']*/gi);
+    if (eetDocMatches) {
+      eetDocMatches.forEach(match => {
+        console.log('   ✅ Found EET document in raw HTML:', match);
+        pdfUrls.push(match);
+      });
+    }
+
+    // Search for data attributes that might contain PDF URLs
+    console.log('🔍 Searching for data attributes...');
+    $('[data-pdf], [data-document], [data-file]').each((index, element) => {
+      const dataPdf = $(element).attr('data-pdf');
+      const dataDocument = $(element).attr('data-document');
+      const dataFile = $(element).attr('data-file');
+      
+      [dataPdf, dataDocument, dataFile].forEach(url => {
+        if (url && (url.includes('.pdf') || url.includes('Doc_'))) {
+          const absoluteUrl = url.startsWith('http') ? url : new URL(url, finalUrl).href;
+          console.log('   ✅ Found PDF in data attribute:', absoluteUrl);
           pdfUrls.push(absoluteUrl);
         }
       });
+    });
 
-      // Also search for specific EET document pattern
-      $('a[href*="product-images.eetgroup.com/documents/Doc_"]').each((index, element) => {
-        const href = $(element).attr('href');
-        if (href && href.includes('product-images.eetgroup.com/documents/Doc_')) {
-          pdfUrls.push(href);
+    // Search for any element with class names that might indicate documents
+    console.log('🔍 Searching for document-related class elements...');
+    $('.document, .pdf, .file, .download, .attachment').each((index, element) => {
+      const href = $(element).attr('href');
+      const onclick = $(element).attr('onclick');
+      
+      if (href && (href.includes('.pdf') || href.includes('Doc_'))) {
+        const absoluteUrl = href.startsWith('http') ? href : new URL(href, finalUrl).href;
+        console.log('   ✅ Found PDF in document class element:', absoluteUrl);
+        pdfUrls.push(absoluteUrl);
+      }
+      
+      if (onclick && onclick.includes('.pdf')) {
+        const pdfMatch = onclick.match(/https?:\/\/[^\s"']*\.pdf/gi);
+        if (pdfMatch) {
+          pdfMatch.forEach(match => {
+            console.log('   ✅ Found PDF in onclick:', match);
+            pdfUrls.push(match);
+          });
         }
-      });
+      }
+    });
 
-      // Remove duplicates
-      const uniquePdfUrls = [...new Set(pdfUrls)];
-
-      logger.info('SHOPIFY_SCRAPE', 'Document scraping completed', {
-        productUrl,
-        pdfUrlsFound: uniquePdfUrls.length,
-        pdfUrls: uniquePdfUrls
-      });
-
-      return uniquePdfUrls;
-    } catch (error) {
-      logger.error('SHOPIFY_SCRAPE', 'Failed to scrape product documents', {
-        productUrl,
-        error: error.message
-      });
-      return [];
-    }
+    return pdfUrls;
   }
 
   /**
