@@ -130,7 +130,7 @@ async function main() {
     // STEP 3: Test the EET to Shopify mapping with first product
     if (jsonData.products.length > 0) {
       const firstEETProduct = jsonData.products[0];
-      const mappedProduct = shopifyClient.mapEETToShopifyProduct(firstEETProduct);
+      const mappedProduct = await shopifyClient.mapEETToShopifyProduct(firstEETProduct);
       
       if (isLoggingEnabled) {
         logger.info('MAPPING_TEST', 'EET to Shopify mapping test completed', {
@@ -160,7 +160,7 @@ async function main() {
     const registeredProducts = [];
     
     for (const eetProduct of jsonData.products) {
-      const mappedProduct = shopifyClient.mapEETToShopifyProduct(eetProduct);
+      const mappedProduct = await shopifyClient.mapEETToShopifyProduct(eetProduct);
       const existingProduct = shopifyClient.findProductBySKU(mappedProduct.variants[0].sku, shopifyProducts);
       
       if (existingProduct) {

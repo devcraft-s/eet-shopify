@@ -1,6 +1,7 @@
 import logger from './logger.js';
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
+import * as cheerio from 'cheerio';
 
 // Load environment variables
 dotenv.config();
@@ -21,11 +22,77 @@ class ShopifyClient {
   }
 
   /**
+   * Scrape PDF document URLs from a product page
+   * @param {string} productUrl - URL of the product page to scrape
+   * @returns {Promise<Array>} Array of PDF URLs found on the page
+   */
+  async scrapeProductDocuments(productUrl) {
+    try {
+      if (!productUrl) {
+        logger.warn('SHOPIFY_SCRAPE', 'No product URL provided for document scraping');
+        return [];
+      }
+
+      logger.info('SHOPIFY_SCRAPE', 'Starting document scraping', { productUrl });
+
+      const response = await fetch(productUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      const pdfUrls = [];
+      
+      // Search for PDF links in various ways
+      $('a[href*=".pdf"]').each((index, element) => {
+        const href = $(element).attr('href');
+        if (href && href.includes('.pdf')) {
+          // Convert relative URLs to absolute URLs
+          const absoluteUrl = href.startsWith('http') ? href : new URL(href, productUrl).href;
+          pdfUrls.push(absoluteUrl);
+        }
+      });
+
+      // Also search for specific EET document pattern
+      $('a[href*="product-images.eetgroup.com/documents/Doc_"]').each((index, element) => {
+        const href = $(element).attr('href');
+        if (href && href.includes('product-images.eetgroup.com/documents/Doc_')) {
+          pdfUrls.push(href);
+        }
+      });
+
+      // Remove duplicates
+      const uniquePdfUrls = [...new Set(pdfUrls)];
+
+      logger.info('SHOPIFY_SCRAPE', 'Document scraping completed', {
+        productUrl,
+        pdfUrlsFound: uniquePdfUrls.length,
+        pdfUrls: uniquePdfUrls
+      });
+
+      return uniquePdfUrls;
+    } catch (error) {
+      logger.error('SHOPIFY_SCRAPE', 'Failed to scrape product documents', {
+        productUrl,
+        error: error.message
+      });
+      return [];
+    }
+  }
+
+  /**
    * Map EET product data to Shopify product structure
    * @param {Object} eetProduct - EET product data
-   * @returns {Object} Shopify product structure
+   * @returns {Promise<Object>} Shopify product structure
    */
-  mapEETToShopifyProduct(eetProduct) {
+  async mapEETToShopifyProduct(eetProduct) {
     try {
       logger.info('SHOPIFY_MAP', 'Mapping EET product to Shopify format', {
         varenr: eetProduct.varenr,
@@ -68,6 +135,20 @@ class ShopifyClient {
         const stockStr = String(eetProduct.lagerbeholdning);
         const cleanStock = stockStr.replace(',', '.');
         stockQuantity = parseInt(parseFloat(cleanStock));
+      }
+
+      // Scrape document URLs from product page
+      let documentUrls = [];
+      if (eetProduct.item_product_link_web) {
+        try {
+          documentUrls = await this.scrapeProductDocuments(eetProduct.item_product_link_web);
+        } catch (error) {
+          logger.warn('SHOPIFY_MAP', 'Failed to scrape documents', {
+            varenr: eetProduct.varenr,
+            productUrl: eetProduct.item_product_link_web,
+            error: error.message
+          });
+        }
       }
 
       const shopifyProduct = {
@@ -119,6 +200,12 @@ class ShopifyClient {
             key: 'docs',
             value: eetProduct.item_product_link_web || '',
             type: 'url'
+          },
+          {
+            namespace: 'streamsupply',
+            key: 'documents',
+            value: JSON.stringify(documentUrls),
+            type: 'json'
           }
         ].filter(metafield => metafield.value), // Only include metafields with values
         images: eetProduct.web_picture_url ? [{
@@ -134,7 +221,8 @@ class ShopifyClient {
         price: shopifyProduct.variants[0].price,
         stock: shopifyProduct.variants[0].inventoryQuantity,
         metafieldsCount: shopifyProduct.metafields.length,
-        hasImage: shopifyProduct.images.length > 0
+        hasImage: shopifyProduct.images.length > 0,
+        documentsCount: documentUrls.length
       });
 
       return shopifyProduct;
