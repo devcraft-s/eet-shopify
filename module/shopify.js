@@ -587,7 +587,6 @@ class ShopifyClient {
 
           try {
             const inventoryResponse = await this.runGraphQL(inventoryMutation);
-            console.log("Inventory update response:", inventoryResponse.data.inventoryAdjustQuantities.userErrors);
 
             if (inventoryResponse.data.inventoryAdjustQuantities.userErrors.length > 0) {
               const inventoryErrors = inventoryResponse.data.inventoryAdjustQuantities.userErrors;
@@ -599,7 +598,6 @@ class ShopifyClient {
                   errors: inventoryErrors
                 });
               }
-              console.log("Inventory update errors:", inventoryErrors);
             } else {
               if (isLoggingEnabled) {
                 logger.info('SHOPIFY_INVENTORY', 'Inventory updated successfully', {
@@ -890,8 +888,6 @@ class ShopifyClient {
             // inventoryQuantity = old quantity - new quantity
             const oldQuantity = variant.inventoryQuantity;
             const inventoryQuantity = newQuantity - oldQuantity;
-
-            console.log("inventoryQuantity", inventoryQuantity, "-------------------------", oldQuantity);
 
             const inventoryMutation = `
               mutation {

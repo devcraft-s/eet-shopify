@@ -283,8 +283,6 @@ async function main() {
 
     if (loginResult.success) {
       const eetPriceAndStock = await eetClient.getAllProductsPriceAndStock(jsonData.products);
-
-      console.log("eetPriceAndStock", JSON.stringify(eetPriceAndStock));
       
       if (eetPriceAndStock && eetPriceAndStock.length > 0) {
         let successCount = 0;
