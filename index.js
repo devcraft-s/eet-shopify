@@ -393,5 +393,4 @@ async function main() {
 // Run the application
 main().then(result => {
   console.log("END!");
-  process.exit(1);
 }).catch(console.error);
