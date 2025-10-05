@@ -226,6 +226,11 @@ class ShopifyClient {
 
       const data = await response.json();
 
+      // wait until the API request limit is restored.
+      if (data.extensions.cost.currentlyAvailable < 1000) {
+        await new Promise(setTimeout(resolve, (data.extensions.cost.maximumAvailable - data.extensions.cost.currentlyAvailable) / data.extensions.cost.restoreRate * 1000));
+      }
+      
       if (data.errors) {
         logger.error('SHOPIFY_GRAPHQL', 'GraphQL errors', {
           errors: data.errors,
