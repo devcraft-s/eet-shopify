@@ -127,33 +127,33 @@ async function main() {
       });
     }
     
-    // STEP 3: Test the EET to Shopify mapping with first product
-    if (jsonData.products.length > 0) {
-      const firstEETProduct = jsonData.products[0];
-      const mappedProduct = await shopifyClient.mapEETToShopifyProduct(firstEETProduct);
+    // // STEP 3: Test the EET to Shopify mapping with first product
+    // if (jsonData.products.length > 0) {
+    //   const firstEETProduct = jsonData.products[0];
+    //   const mappedProduct = await shopifyClient.mapEETToShopifyProduct(firstEETProduct);
       
-      if (isLoggingEnabled) {
-        logger.info('MAPPING_TEST', 'EET to Shopify mapping test completed', {
-          originalEET: {
-            varenr: firstEETProduct.varenr,
-            beskrivelse: firstEETProduct.beskrivelse,
-            maerke_navn: firstEETProduct.maerke_navn,
-            pris: firstEETProduct.pris,
-            lagerbeholdning: firstEETProduct.lagerbeholdning
-          },
-          mappedShopify: {
-            title: mappedProduct.title,
-            vendor: mappedProduct.vendor,
-            productType: mappedProduct.productType,
-            sku: mappedProduct.variants[0].sku,
-            price: mappedProduct.variants[0].price,
-            inventoryQuantity: mappedProduct.variants[0].inventoryQuantity,
-            metafieldsCount: mappedProduct.metafields.length,
-            hasImage: mappedProduct.images.length > 0
-          }
-        });
-      }
-    }
+    //   if (isLoggingEnabled) {
+    //     logger.info('MAPPING_TEST', 'EET to Shopify mapping test completed', {
+    //       originalEET: {
+    //         varenr: firstEETProduct.varenr,
+    //         beskrivelse: firstEETProduct.beskrivelse,
+    //         maerke_navn: firstEETProduct.maerke_navn,
+    //         pris: firstEETProduct.pris,
+    //         lagerbeholdning: firstEETProduct.lagerbeholdning
+    //       },
+    //       mappedShopify: {
+    //         title: mappedProduct.title,
+    //         vendor: mappedProduct.vendor,
+    //         productType: mappedProduct.productType,
+    //         sku: mappedProduct.variants[0].sku,
+    //         price: mappedProduct.variants[0].price,
+    //         inventoryQuantity: mappedProduct.variants[0].inventoryQuantity,
+    //         metafieldsCount: mappedProduct.metafields.length,
+    //         hasImage: mappedProduct.images.length > 0
+    //       }
+    //     });
+    //   }
+    // }
     
     // STEP 4: Extract the list of products not registered in Shopify from eetData
     const unregisteredProducts = [];
