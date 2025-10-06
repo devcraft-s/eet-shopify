@@ -896,6 +896,39 @@ class ShopifyClient {
           }
         }
       }
+
+      // Update stock object immediately after product creation
+      if (createdProduct.variants.nodes.length > 0) {
+        const sku = productData.variants[0].sku || '';
+        const stockObject = {
+          sku: sku,
+          quantity: productData.variants[0].inventoryQuantity || 0,
+          price: productData.variants[0].price,
+          barcode: productData.variants[0].barcode || '',
+          weight: productData.variants[0].weight,
+          weightUnit: productData.variants[0].weightUnit
+        };
+
+        try {
+          console.log('📦 Updating stock object for product:', createdProduct.title);
+          const stockUpdateResult = await this.updateStockObject(sku, stockObject, createdProduct);
+          
+          if (stockUpdateResult.success) {
+            console.log('✅ Stock object updated successfully for SKU:', sku);
+          } else {
+            console.log('❌ Stock object update failed for SKU:', sku, stockUpdateResult.error);
+          }
+        } catch (stockError) {
+          console.log('❌ Error updating stock object for SKU:', sku, stockError.message);
+          if (isLoggingEnabled) {
+            logger.error('SHOPIFY_STOCK_OBJECT', 'Failed to update stock object', {
+              productId: createdProduct.id,
+              sku: sku,
+              error: stockError.message
+            });
+          }
+        }
+      }
       
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_CREATE', 'Product created successfully', {
