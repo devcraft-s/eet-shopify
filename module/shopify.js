@@ -434,6 +434,10 @@ class ShopifyClient {
       }
       
       if (data.errors) {
+        logger.info('SHOPIFY_GRAPHQL', 'GraphQL errors', {
+          errors: data.errors,
+          query: query.substring(0, 100) + '...'
+        });
         logger.error('SHOPIFY_GRAPHQL', 'GraphQL errors', {
           errors: data.errors,
           query: query.substring(0, 100) + '...'

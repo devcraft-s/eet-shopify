@@ -287,6 +287,8 @@ async function main() {
       if (eetPriceAndStock && eetPriceAndStock.length > 0) {
         let successCount = 0;
         let errorCount = 0;
+
+        const shopifyProducts = await shopifyClient.getAllProducts();
         
         for (const eetItem of eetPriceAndStock) {
           try {
