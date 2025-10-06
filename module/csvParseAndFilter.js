@@ -45,6 +45,7 @@ class EETProductFilter {
       createReadStream(filePath, { encoding: 'utf8' })
         .pipe(csv({
           separator: ';',
+          skipEmptyLines: true,
           headers: [
             'varenr',           // Product number (SKU)
             'beskrivelse',      // Description
@@ -148,7 +149,7 @@ class EETProductFilter {
       console.log(`📦 Removed ${removedZeroStock} products with zero stock: ${filteredProducts.length} products remaining`);
     }
 
-    // Apply include filters - use OR logic for include filters
+    // Apply include filters - use AND logic for include filters
     if (this.filterConfig.include) {
       const includeBrands = this.filterConfig.include.brand ? 
         this.filterConfig.include.brand.map(b => b.toLowerCase()) : [];
@@ -162,7 +163,8 @@ class EETProductFilter {
           const skuMatch = includeSkus.length === 0 || 
             includeSkus.includes(product.varenr.toLowerCase());
           
-          return brandMatch || skuMatch;
+          // Use AND logic: both brand and SKU conditions must be satisfied
+          return brandMatch && skuMatch;
         });
         console.log(`📦 After include filters: ${filteredProducts.length} products`);
       }
