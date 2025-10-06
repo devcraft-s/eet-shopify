@@ -3,7 +3,8 @@
     "brand": [
       "Axis",
       "Hikvision"
-    ]
+    ],
+    "sku": []
   },
   "exclude": {
     "brand": [],
