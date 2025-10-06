@@ -301,9 +301,10 @@ async function main() {
             if (eetItem.Price) {
               price = parseFloat(eetItem.Price.Price) + parseFloat(eetItem.Price.VatAmount);
             }
+            const cost = parseFloat(eetItem.Price.Price);
 
             if (price !== null) {
-              const result = await shopifyClient.updateProductPrice(sku, price, product);
+              const result = await shopifyClient.updateProductPrice(sku, price, product, cost);
 
               if (result.success) {
                 successCount++;

@@ -296,7 +296,7 @@ class ShopifyClient {
         ].filter(Boolean).join(','),
         variants: [{
           sku: eetProduct.varenr,
-          price: priceInCents ? (priceInCents / 100).toFixed(2) : '0.00',
+          price: priceInCents ? (priceInCents) : '0',
           weight: weightInKg,
           weightUnit: weightUnit,
           barcode: eetProduct.ean_upc || '',
@@ -685,12 +685,12 @@ class ShopifyClient {
       const mutation = `
         mutation {
           productCreate(
-            ${imageUrl ? `media: { originalSource: "${imageUrl}", mediaContentType: IMAGE }` : ''}
+            ${imageUrl ? `media: { originalSource: "${imageUrl}", mediaContentType: IMAGE },` : ''}
             product: {
               title: "${title}",
               status: ACTIVE,
               vendor: "${vendor}",
-              descriptionHtml: "${descriptionHtml}",
+              descriptionHtml: "${descriptionHtml.replace(/"/g, '\\"')}",
               ${metafields ? `metafields: [${metafields}]` : ''}
             }
           ) {
@@ -1310,12 +1310,13 @@ class ShopifyClient {
    * @param {Array} shopifyProducts - Array of all Shopify products
    * @returns {Promise<Object>} Update result
    */
-  async updateProductPrice(sku, newPrice, product) {
+  async updateProductPrice(sku, newPrice, product, cost) {
     try {
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_UPDATE_PRICE', 'Starting price update', {
           sku,
-          newPrice
+          newPrice,
+          cost
         });
       }
       
@@ -1339,7 +1340,7 @@ class ShopifyClient {
       // Update price if provided
       if (newPrice !== null && newPrice !== undefined && variant.price !== newPrice) {
         try {
-          const priceInDecimal = (newPrice / 100).toFixed(2);
+          const priceInDecimal = (newPrice);
           
           const priceUpdateMutation = `
             mutation {
@@ -1347,7 +1348,10 @@ class ShopifyClient {
                 productId: "${product.id}"
                 variants: {
                   id: "${variant.id}",
-                  price: "${priceInDecimal}"
+                  price: "${priceInDecimal}",
+                  inventoryItem: {
+                    cost: "${cost}"
+                  }
                 }
               ) {
                 userErrors {
