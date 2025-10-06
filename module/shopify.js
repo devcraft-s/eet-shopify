@@ -1,6 +1,7 @@
 import logger from './logger.js';
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
+import { chromium } from 'playwright';
 
 // Load environment variables
 dotenv.config();
@@ -21,11 +22,191 @@ class ShopifyClient {
   }
 
   /**
+   * Scrape PDF document URLs from a product page using Playwright
+   * @param {string} productUrl - URL of the product page to scrape
+   * @returns {Promise<Array>} Array of PDF URLs found on the page
+   */
+  async scrapeProductDocuments(productUrl) {
+    if (!productUrl) {
+      console.log('❌ No product URL provided for document scraping');
+      return [];
+    }
+
+    console.log('🔍 Starting Playwright document scraping for URL:', productUrl);
+
+    let browser;
+    try {
+      // Launch browser with stealth settings
+      browser = await chromium.launch({ headless: true });
+      const context = await browser.newContext({
+        viewport: { width: 1366, height: 768 },
+        locale: 'en-US',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36'
+      });
+
+      // Add stealth scripts
+      await context.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+        Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+        Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+      });
+
+      let urls = [];
+
+      // Try different locales
+      const locales = ['da-dk', 'en-eu', 'en'];
+      for (const loc of locales) {
+        const page = await context.newPage();
+        try {
+          // Use the product URL directly - it will redirect to the full product page
+          let targetUrl = productUrl;
+          
+          // If it's an itemId URL, try to construct the direct product URL for this locale
+          if (productUrl.includes('itemId?itemid=')) {
+            const sku = productUrl.split('itemId?itemid=')[1];
+            // Try to construct a direct product URL based on the pattern you showed
+            targetUrl = `https://www.eetgroup.com/${loc}/itemId?itemid=${sku}`;
+          }
+
+          console.log(`🔍 Trying locale ${loc} with URL:`, targetUrl);
+          await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 60000 });
+
+          // Accept cookies if any
+          await this.acceptCookies(page);
+
+          // Wait for potential redirect to complete
+          await page.waitForTimeout(2000);
+          
+          // Get the final URL after redirects
+          const finalUrl = page.url();
+          console.log(`📍 Final URL after redirect:`, finalUrl);
+
+          // Debug: Check page title and content
+          const pageTitle = await page.title();
+          console.log(`📄 Page title:`, pageTitle);
+
+          // Try clicking Documents/Dokumenter tab if present
+          const docTab = page.locator('text=Dokumenter, text=Documents').first();
+          if (await docTab.count()) {
+            console.log('📄 Clicking Documents tab...');
+            await docTab.click().catch(() => {});
+            await page.waitForTimeout(1000);
+          }
+
+          // Scroll to trigger lazy rendering
+          console.log('📜 Scrolling to trigger lazy loading...');
+          for (let y = 0; y < 5; y++) {
+            await page.mouse.wheel(0, 800);
+            await page.waitForTimeout(600);
+          }
+          await page.waitForTimeout(1500);
+
+          // First, try to find the documents container specifically
+          console.log('🔍 Searching in #documents container...');
+          const documentsContainer = await page.locator('#documents').count();
+          console.log(`   Documents container found: ${documentsContainer > 0}`);
+          
+          if (documentsContainer > 0) {
+            // Search specifically in the documents container
+            urls = await page.$$eval('#documents a[href*=".pdf"]', as =>
+              Array.from(new Set(
+                as.map(a => {
+                  try { 
+                    return new URL(a.getAttribute('href'), location.href).href; 
+                  } catch { 
+                    return null; 
+                  }
+                }).filter(u => u && /\.pdf(\?|$)/i.test(u))
+              ))
+            );
+            console.log(`   Found ${urls.length} PDFs in documents container`);
+          }
+
+          // If no documents found in container, try all anchors on page
+          if (!urls.length) {
+            console.log('🔍 Searching for PDF links in all anchors...');
+            urls = await page.$$eval('a[href*=".pdf"]', as =>
+              Array.from(new Set(
+                as.map(a => {
+                  try { 
+                    return new URL(a.getAttribute('href'), location.href).href; 
+                  } catch { 
+                    return null; 
+                  }
+                }).filter(u => u && /\.pdf(\?|$)/i.test(u))
+              ))
+            );
+            console.log(`   Found ${urls.length} PDFs in all anchors`);
+          }
+
+          // Fallback: regex over HTML if anchors weren't visible
+          if (!urls.length) {
+            console.log('🔍 Fallback: Searching in HTML content...');
+            const html = await page.content();
+            const rx = /https?:\/\/[^\s"'<>]+?Doc_\d+\.pdf/gi;
+            const found = [...html.matchAll(rx)].map(m => m[0]);
+            urls = Array.from(new Set(found));
+            console.log(`   Found ${urls.length} PDFs in HTML content`);
+          }
+
+          // Prefer product-images.eetgroup.com and limit to 4
+          const preferred = urls.filter(u => /product-images\.eetgroup\.com/i.test(u));
+          urls = (preferred.length ? preferred : urls).slice(0, 4);
+
+          console.log(`✅ Found ${urls.length} documents for locale ${loc}:`, urls);
+
+          if (urls.length) break; // Found documents, we're done
+        } catch (error) {
+          console.log(`❌ Error with locale ${loc}:`, error.message);
+        } finally {
+          await page.close();
+        }
+      }
+
+      console.log('📊 Final scraping results:', urls);
+      return urls;
+
+    } catch (error) {
+      console.log('❌ Error during Playwright scraping:', error.message);
+      return [];
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
+    }
+  }
+
+  /**
+   * Helper method to accept cookies on the page
+   * @param {Object} page - Playwright page object
+   */
+  async acceptCookies(page) {
+    const selectors = [
+      'button:has-text("Accept")',
+      'button:has-text("I accept")',
+      'button:has-text("Accepter")',
+      'button:has-text("Godkend")',
+      '.cookie-accept',
+      '.cc-allow',
+      '.js-accept-cookies',
+      '[data-test*="accept"]'
+    ];
+
+    for (const selector of selectors) {
+      const button = page.locator(selector).first();
+      if (await button.count()) {
+        await button.click().catch(() => {});
+        await page.waitForTimeout(200);
+      }
+    }
+  }
+
+  /**
    * Map EET product data to Shopify product structure
    * @param {Object} eetProduct - EET product data
-   * @returns {Object} Shopify product structure
+   * @returns {Promise<Object>} Shopify product structure
    */
-  mapEETToShopifyProduct(eetProduct) {
+  async mapEETToShopifyProduct(eetProduct) {
     try {
       logger.info('SHOPIFY_MAP', 'Mapping EET product to Shopify format', {
         varenr: eetProduct.varenr,
@@ -68,6 +249,20 @@ class ShopifyClient {
         const stockStr = String(eetProduct.lagerbeholdning);
         const cleanStock = stockStr.replace(',', '.');
         stockQuantity = parseInt(parseFloat(cleanStock));
+      }
+
+      // Scrape document URLs from product page using Playwright
+      let documentUrls = [];
+      if (eetProduct.item_product_link) {
+        try {
+          documentUrls = await this.scrapeProductDocuments(eetProduct.item_product_link);
+        } catch (error) {
+          logger.warn('SHOPIFY_MAP', 'Failed to scrape documents', {
+            varenr: eetProduct.varenr,
+            productUrl: eetProduct.item_product_link,
+            error: error.message
+          });
+        }
       }
 
       const shopifyProduct = {
@@ -117,8 +312,14 @@ class ShopifyClient {
           {
             namespace: 'streamsupply',
             key: 'docs',
-            value: eetProduct.item_product_link_web || '',
+            value: eetProduct.item_product_link || '',
             type: 'url'
+          },
+          {
+            namespace: 'streamsupply',
+            key: 'documents',
+            value: `${JSON.stringify(documentUrls).replace(/"/g, '\\"')}`,
+            type: 'json'
           }
         ].filter(metafield => metafield.value), // Only include metafields with values
         images: eetProduct.web_picture_url ? [{
@@ -134,7 +335,8 @@ class ShopifyClient {
         price: shopifyProduct.variants[0].price,
         stock: shopifyProduct.variants[0].inventoryQuantity,
         metafieldsCount: shopifyProduct.metafields.length,
-        hasImage: shopifyProduct.images.length > 0
+        hasImage: shopifyProduct.images.length > 0,
+        documentsCount: documentUrls.length
       });
 
       return shopifyProduct;

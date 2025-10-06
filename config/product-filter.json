@@ -3,9 +3,6 @@
     "brand": [
       "Axis",
       "Hikvision"
-    ],
-    "sku": [
-      "PRODPAM10"
     ]
   },
   "exclude": {
@@ -14,5 +11,5 @@
       "W127015470"
     ]
   },
-  "include_products_limit": 10
+  "include_products_limit": 2
 }
