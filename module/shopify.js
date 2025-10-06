@@ -107,35 +107,61 @@ class ShopifyClient {
           console.log(`   Documents container found: ${documentsContainer > 0}`);
           
           if (documentsContainer > 0) {
-            // Search specifically in the documents container
-            urls = await page.$$eval('#documents a[href*=".pdf"]', as =>
-              Array.from(new Set(
-                as.map(a => {
-                  try { 
-                    return new URL(a.getAttribute('href'), location.href).href; 
-                  } catch { 
-                    return null; 
-                  }
-                }).filter(u => u && /\.pdf(\?|$)/i.test(u))
-              ))
+            // Search specifically in the documents container and extract both URL and label
+            const documents = await page.$$eval('#documents a[href*=".pdf"]', as =>
+              as.map(a => {
+                try { 
+                  const url = new URL(a.getAttribute('href'), location.href).href;
+                  if (!url || !/\.pdf(\?|$)/i.test(url)) return null;
+                  
+                  // Extract label from the text content
+                  const labelElement = a.querySelector('p span.underline');
+                  const label = labelElement ? labelElement.textContent.trim() : 'Document';
+                  
+                  return {
+                    label: label,
+                    url: url
+                  };
+                } catch { 
+                  return null; 
+                }
+              }).filter(doc => doc !== null)
             );
-            console.log(`   Found ${urls.length} PDFs in documents container`);
+            
+            // Convert to the format you want
+            urls = documents;
+            console.log(`   Found ${urls.length} PDFs in documents container:`, urls);
           }
 
           // If no documents found in container, try all anchors on page
           if (!urls.length) {
             console.log('🔍 Searching for PDF links in all anchors...');
-            urls = await page.$$eval('a[href*=".pdf"]', as =>
-              Array.from(new Set(
-                as.map(a => {
-                  try { 
-                    return new URL(a.getAttribute('href'), location.href).href; 
-                  } catch { 
-                    return null; 
-                  }
-                }).filter(u => u && /\.pdf(\?|$)/i.test(u))
-              ))
+            const documents = await page.$$eval('a[href*=".pdf"]', as =>
+              as.map(a => {
+                try { 
+                  const url = new URL(a.getAttribute('href'), location.href).href;
+                  if (!url || !/\.pdf(\?|$)/i.test(url)) return null;
+                  
+                  // Try to extract label from various possible elements
+                  const labelElement = a.querySelector('span.underline, p, span') || a;
+                  const label = labelElement ? labelElement.textContent.trim().substring(0, 50) : 'Document';
+                  
+                  return {
+                    label: label,
+                    url: url
+                  };
+                } catch { 
+                  return null; 
+                }
+              }).filter(doc => doc !== null)
             );
+            
+            // Remove duplicates based on URL
+            const uniqueDocs = documents.filter((doc, index, self) => 
+              index === self.findIndex(d => d.url === doc.url)
+            );
+            
+            urls = uniqueDocs;
             console.log(`   Found ${urls.length} PDFs in all anchors`);
           }
 
@@ -145,12 +171,17 @@ class ShopifyClient {
             const html = await page.content();
             const rx = /https?:\/\/[^\s"'<>]+?Doc_\d+\.pdf/gi;
             const found = [...html.matchAll(rx)].map(m => m[0]);
-            urls = Array.from(new Set(found));
+            
+            // Convert to document format
+            urls = Array.from(new Set(found)).map(url => ({
+              label: 'Document',
+              url: url
+            }));
             console.log(`   Found ${urls.length} PDFs in HTML content`);
           }
 
           // Prefer product-images.eetgroup.com and limit to 4
-          const preferred = urls.filter(u => /product-images\.eetgroup\.com/i.test(u));
+          const preferred = urls.filter(doc => /product-images\.eetgroup\.com/i.test(doc.url));
           urls = (preferred.length ? preferred : urls).slice(0, 4);
 
           console.log(`✅ Found ${urls.length} documents for locale ${loc}:`, urls);
@@ -318,7 +349,7 @@ class ShopifyClient {
           {
             namespace: 'streamsupply',
             key: 'documents',
-            value: `${JSON.stringify(documentUrls).replace(/"/g, '\\"')}`,
+            value: JSON.stringify(documentUrls),
             type: 'json'
           }
         ].filter(metafield => metafield.value), // Only include metafields with values
@@ -336,7 +367,8 @@ class ShopifyClient {
         stock: shopifyProduct.variants[0].inventoryQuantity,
         metafieldsCount: shopifyProduct.metafields.length,
         hasImage: shopifyProduct.images.length > 0,
-        documentsCount: documentUrls.length
+        documentsCount: documentUrls.length,
+        documents: documentUrls
       });
 
       return shopifyProduct;
@@ -427,13 +459,9 @@ class ShopifyClient {
       }
 
       const data = await response.json();
-
-      // wait until the API request limit is restored.
-      if (data.extensions.cost.currentlyAvailable < 1000) {
-        await new Promise(setTimeout(resolve, (data.extensions.cost.maximumAvailable - data.extensions.cost.currentlyAvailable) / data.extensions.cost.restoreRate * 1000));
-      }
       
       if (data.errors) {
+        console.log(query);
         logger.info('SHOPIFY_GRAPHQL', 'GraphQL errors', {
           errors: data.errors,
           query: query.substring(0, 100) + '...'
@@ -443,6 +471,11 @@ class ShopifyClient {
           query: query.substring(0, 100) + '...'
         });
         throw new Error(`GraphQL errors: ${data.errors.map(e => e.message).join(', ')}`);
+      }
+
+      // wait until the API request limit is restored.
+      if (data.extensions.cost.currentlyAvailable < 1000) {
+        await new Promise(setTimeout(resolve, (data.extensions.cost.maximumAvailable - data.extensions.cost.currentlyAvailable) / data.extensions.cost.restoreRate * 1000));
       }
 
       logger.info('SHOPIFY_GRAPHQL', 'GraphQL query executed successfully', {
@@ -618,13 +651,15 @@ class ShopifyClient {
       const imageUrl = productData.images && productData.images.length > 0 ? productData.images[0].src : null;
       
       // Build metafields array
-      const metafields = productData.metafields ? productData.metafields.map(mf => 
-        `{
+      const metafields = productData.metafields ? productData.metafields.map(mf => {
+        // Properly escape the value for GraphQL
+        const escapedValue = mf.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+        return `{
           key: "${mf.key}",
           namespace: "${mf.namespace}",
-          value: "${mf.value}"
-        }`
-      ).join(',') : '';
+          value: "${escapedValue}"
+        }`;
+      }).join(',') : '';
 
       // create product mutation
       const mutation = `
@@ -1378,7 +1413,7 @@ class ShopifyClient {
               metafields: {
                 key: "stock_object",
                 namespace: "streamsupply",
-                value: "${JSON.stringify(stockObject).replace(/"/g, '\\"')}"
+                value: "${JSON.stringify(stockObject).replace(/"/g, '\\"').replace(/'/g, '\\\'')}"
               },
               id: "${product.id}"
             }
