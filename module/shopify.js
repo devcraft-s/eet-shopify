@@ -282,19 +282,7 @@ class ShopifyClient {
         stockQuantity = parseInt(parseFloat(cleanStock));
       }
 
-      // Scrape document URLs from product page using Playwright
-      let documentUrls = [];
-      if (eetProduct.item_product_link) {
-        try {
-          documentUrls = await this.scrapeProductDocuments(eetProduct.item_product_link);
-        } catch (error) {
-          logger.warn('SHOPIFY_MAP', 'Failed to scrape documents', {
-            varenr: eetProduct.varenr,
-            productUrl: eetProduct.item_product_link,
-            error: error.message
-          });
-        }
-      }
+      // Document scraping will be done just before product creation
 
       const shopifyProduct = {
         title: eetProduct.beskrivelse || `Product ${eetProduct.varenr}`,
@@ -346,12 +334,7 @@ class ShopifyClient {
             value: eetProduct.item_product_link || '',
             type: 'url'
           },
-          {
-            namespace: 'streamsupply',
-            key: 'documents',
-            value: JSON.stringify(documentUrls),
-            type: 'json'
-          }
+          // Documents metafield will be added just before product creation
         ].filter(metafield => metafield.value), // Only include metafields with values
         images: eetProduct.web_picture_url ? [{
           src: eetProduct.web_picture_url,
@@ -366,9 +349,7 @@ class ShopifyClient {
         price: shopifyProduct.variants[0].price,
         stock: shopifyProduct.variants[0].inventoryQuantity,
         metafieldsCount: shopifyProduct.metafields.length,
-        hasImage: shopifyProduct.images.length > 0,
-        documentsCount: documentUrls.length,
-        documents: documentUrls
+        hasImage: shopifyProduct.images.length > 0
       });
 
       return shopifyProduct;
@@ -637,11 +618,50 @@ class ShopifyClient {
    */
   async createProduct(productData) {
     try {
+      // Scrape document URLs just before creating the product
+      let documentUrls = [];
+      const productUrl = productData.metafields?.find(mf => mf.key === 'docs')?.value;
+
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_CREATE', 'Creating new product', {
           title: productData.title,
-          sku: productData.variants[0]?.sku
+          sku: productData.variants[0]?.sku,
+          hasProductUrl: !!productUrl
         });
+      }
+      if (productUrl) {
+        try {
+          console.log('🔍 Scraping documents for product:', productData.title);
+          documentUrls = await this.scrapeProductDocuments(productUrl);
+          console.log('✅ Scraped documents:', documentUrls.length, 'found');
+        } catch (error) {
+          logger.warn('SHOPIFY_CREATE', 'Failed to scrape documents', {
+            title: productData.title,
+            productUrl: productUrl,
+            error: error.message
+          });
+        }
+      }
+
+      // Add documents metafield if documents were found
+      if (documentUrls.length > 0) {
+        if (!productData.metafields) {
+          productData.metafields = [];
+        }
+        productData.metafields.push({
+          namespace: 'streamsupply',
+          key: 'documents',
+          value: JSON.stringify(documentUrls),
+          type: 'json'
+        });
+        
+        if (isLoggingEnabled) {
+          logger.info('SHOPIFY_CREATE', 'Added documents metafield', {
+            title: productData.title,
+            documentsCount: documentUrls.length,
+            documents: documentUrls
+          });
+        }
       }
 
       // Extract data from productData
