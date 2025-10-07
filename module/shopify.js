@@ -296,7 +296,7 @@ class ShopifyClient {
         ].filter(Boolean).join(','),
         variants: [{
           sku: eetProduct.varenr,
-          price: priceInCents ? (priceInCents) : '0',
+          price: priceInCents ? (priceInCents / 100).toFixed(2) : '0.00',
           weight: weightInKg,
           weightUnit: weightUnit,
           barcode: eetProduct.ean_upc || '',
@@ -1340,7 +1340,7 @@ class ShopifyClient {
       // Update price if provided
       if (newPrice !== null && newPrice !== undefined && variant.price !== newPrice) {
         try {
-          const priceInDecimal = (newPrice);
+          const priceInDecimal = (newPrice / 100).toFixed(2);
           
           const priceUpdateMutation = `
             mutation {
@@ -1350,7 +1350,7 @@ class ShopifyClient {
                   id: "${variant.id}",
                   price: "${priceInDecimal}",
                   inventoryItem: {
-                    cost: "${cost}"
+                    cost: "${(cost / 100).toFixed(2)}"
                   }
                 }
               ) {
