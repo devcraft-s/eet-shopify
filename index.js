@@ -160,7 +160,7 @@ async function main() {
     const registeredProducts = [];
     
     for (const eetProduct of jsonData.products) {
-      const mappedProduct = await shopifyClient.mapEETToShopifyProduct(eetProduct, jsonData.metadata.filterConfig);
+      const mappedProduct = await shopifyClient.mapEETToShopifyProduct(eetProduct);
       const existingProduct = shopifyClient.findProductBySKU(mappedProduct.variants[0].sku, shopifyProducts);
       
       if (existingProduct) {
@@ -304,17 +304,7 @@ async function main() {
             const cost = parseFloat(eetItem.Price.Price);
 
             if (price !== null) {
-              // Calculate stock quantity for price adjustment
-              let stockQuantity = 0;
-              if (eetItem.Stock && eetItem.Stock.length > 0) {
-                eetItem.Stock.forEach(stock => {
-                  if (stock.StockTypeName === "Local" || stock.StockTypeName === "Remote") {
-                    stockQuantity += parseInt(stock.Quantity) || 0;
-                  }
-                });
-              }
-              
-              const result = await shopifyClient.updateProductPrice(sku, price, product, cost, jsonData.metadata.filterConfig, stockQuantity);
+              const result = await shopifyClient.updateProductPrice(sku, price, product, cost);
 
               if (result.success) {
                 successCount++;
