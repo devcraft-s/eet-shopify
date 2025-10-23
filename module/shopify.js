@@ -235,9 +235,10 @@ class ShopifyClient {
   /**
    * Map EET product data to Shopify product structure
    * @param {Object} eetProduct - EET product data
+   * @param {Object} filterConfig - Filter configuration containing price_stock_percent
    * @returns {Promise<Object>} Shopify product structure
    */
-  async mapEETToShopifyProduct(eetProduct) {
+  async mapEETToShopifyProduct(eetProduct, filterConfig = null) {
     try {
       logger.info('SHOPIFY_MAP', 'Mapping EET product to Shopify format', {
         varenr: eetProduct.varenr,
@@ -280,6 +281,24 @@ class ShopifyClient {
         const stockStr = String(eetProduct.lagerbeholdning);
         const cleanStock = stockStr.replace(',', '.');
         stockQuantity = parseInt(parseFloat(cleanStock));
+      }
+
+      // Apply stock-based price increase if configured
+      if (priceInCents && filterConfig && filterConfig.price_stock_percent && stockQuantity > 0) {
+        const stockPercent = parseFloat(filterConfig.price_stock_percent);
+        const stockIncrease = Math.round(priceInCents * stockPercent * stockQuantity);
+        priceInCents += stockIncrease;
+        
+        if (isLoggingEnabled) {
+          logger.info('SHOPIFY_MAP', 'Applied stock-based price increase', {
+            varenr: eetProduct.varenr,
+            originalPrice: (priceInCents - stockIncrease) / 100,
+            stockQuantity: stockQuantity,
+            stockPercent: stockPercent,
+            stockIncrease: stockIncrease / 100,
+            finalPrice: priceInCents / 100
+          });
+        }
       }
 
       // Document scraping will be done just before product creation
@@ -1307,10 +1326,13 @@ class ShopifyClient {
    * Update product price only
    * @param {string} sku - Product SKU to update
    * @param {number} newPrice - New price in cents (will be converted to decimal)
-   * @param {Array} shopifyProducts - Array of all Shopify products
+   * @param {Object} product - Shopify product object
+   * @param {number} cost - Product cost
+   * @param {Object} filterConfig - Filter configuration containing price_stock_percent
+   * @param {number} stockQuantity - Current stock quantity for price calculation
    * @returns {Promise<Object>} Update result
    */
-  async updateProductPrice(sku, newPrice, product, cost) {
+  async updateProductPrice(sku, newPrice, product, cost, filterConfig = null, stockQuantity = 0) {
     try {
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_UPDATE_PRICE', 'Starting price update', {
@@ -1337,10 +1359,29 @@ class ShopifyClient {
         return { success: false, error };
       }
 
+      // Apply stock-based price increase if configured
+      let adjustedPrice = newPrice;
+      if (newPrice !== null && newPrice !== undefined && filterConfig && filterConfig.price_stock_percent && stockQuantity > 0) {
+        const stockPercent = parseFloat(filterConfig.price_stock_percent);
+        const stockIncrease = Math.round(newPrice * stockPercent * stockQuantity);
+        adjustedPrice = newPrice + stockIncrease;
+        
+        if (isLoggingEnabled) {
+          logger.info('SHOPIFY_UPDATE_PRICE', 'Applied stock-based price increase', {
+            sku,
+            originalPrice: newPrice / 100,
+            stockQuantity: stockQuantity,
+            stockPercent: stockPercent,
+            stockIncrease: stockIncrease / 100,
+            finalPrice: adjustedPrice / 100
+          });
+        }
+      }
+
       // Update price if provided
-      if (newPrice !== null && newPrice !== undefined && variant.price !== newPrice) {
+      if (adjustedPrice !== null && adjustedPrice !== undefined && variant.price !== (adjustedPrice / 100).toFixed(2)) {
         try {
-          const priceInDecimal = (newPrice / 100).toFixed(2);
+          const priceInDecimal = (adjustedPrice / 100).toFixed(2);
           
           const priceUpdateMutation = `
             mutation {

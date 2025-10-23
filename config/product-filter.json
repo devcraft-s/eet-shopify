@@ -11,5 +11,6 @@
       "W127015470"
     ]
   },
-  "include_products_limit": 1000
+  "include_products_limit": 2000,
+  "price_stock_percent": 0.1
 }
