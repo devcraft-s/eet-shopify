@@ -74,6 +74,7 @@ async function main() {
     const production = process.env.PRODUCTION || 'development';
     const language = process.env.LANGUAGE || 'EN';
     const eetPriceFile = process.env.EET_PRICE || 'eet_prices.txt';
+    const priceStock = parseFloat(process.env.PRICE_STOCK) || 0;
     
     if (isLoggingEnabled) {
       logger.info('CONFIG', 'Environment configuration loaded', {

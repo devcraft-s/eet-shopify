@@ -6,6 +6,8 @@ import { chromium } from 'playwright';
 // Load environment variables
 dotenv.config();
 
+const priceStock = parseFloat(process.env.PRICE_STOCK) || 0;
+
 // Check if logging is disabled
 const isLoggingEnabled = process.env.LOGGING !== 'false';
 
@@ -687,7 +689,7 @@ class ShopifyClient {
           productCreate(
             ${imageUrl ? `media: { originalSource: "${imageUrl}", mediaContentType: IMAGE },` : ''}
             product: {
-              title: "${title}",
+              title: "${title.replace(/"/g, '\\"')}",
               status: ACTIVE,
               vendor: "${vendor}",
               descriptionHtml: "${descriptionHtml.replace(/"/g, '\\"')}",
@@ -743,7 +745,7 @@ class ShopifyClient {
       // Update variant with SKU, barcode, and price, product weight, product weight unit
       if (createdProduct.variants.nodes.length > 0) {
         const variant = createdProduct.variants.nodes[0];
-        const adjustedPrice = productData.variants[0].price;
+        const adjustedPrice = Number(productData.variants[0].price) * (1 + priceStock);
         const barcode = productData.variants[0].barcode || '';
         const sku = productData.variants[0].sku || '';
 
@@ -903,7 +905,7 @@ class ShopifyClient {
         const stockObject = {
           sku: sku,
           quantity: productData.variants[0].inventoryQuantity || 0,
-          price: productData.variants[0].price,
+          price: Number(productData.variants[0].price) * (1 + priceStock),
           barcode: productData.variants[0].barcode || '',
           weight: productData.variants[0].weight,
           weightUnit: productData.variants[0].weightUnit
@@ -1340,7 +1342,7 @@ class ShopifyClient {
       // Update price if provided
       if (newPrice !== null && newPrice !== undefined && variant.price !== newPrice) {
         try {
-          const priceInDecimal = (newPrice / 100).toFixed(2);
+          const priceInDecimal = (newPrice / 100 * (1 + priceStock)).toFixed(2);
           
           const priceUpdateMutation = `
             mutation {
