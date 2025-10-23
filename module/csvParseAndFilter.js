@@ -143,7 +143,7 @@ class EETProductFilter {
 
     // Remove products with zero stock
     const beforeStockFilter = filteredProducts.length;
-    filteredProducts = filteredProducts.filter(product => product.lagerbeholdning > 0);
+    // filteredProducts = filteredProducts.filter(product => product.lagerbeholdning > 0);
     const removedZeroStock = beforeStockFilter - filteredProducts.length;
     if (removedZeroStock > 0) {
       console.log(`📦 Removed ${removedZeroStock} products with zero stock: ${filteredProducts.length} products remaining`);

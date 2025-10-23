@@ -760,8 +760,8 @@ class ShopifyClient {
                   tracked: true,
                   measurement: {
                     weight: {
-                      value: ${productData.variants[0].weight},
-                      unit: ${productData.variants[0].weightUnit}
+                      value: ${productData.variants[0].weight ? productData.variants[0].weight : 0},
+                      unit: ${productData.variants[0].weightUnit ? productData.variants[0].weightUnit : 'KILOGRAMS'}
                     }
                   }
                 }
