@@ -101,15 +101,22 @@ For products already in your store, the app:
 - Updates stock quantities
 - Refreshes product information
 
-Step 7: Hide Out-of-Stock Products
+Step 7: Stock Filtering
+Products are filtered based on stock availability:
+- If product has stock (local or remote): Product stays ACTIVE
+- If product has NO stock available: Product is set to DRAFT (hidden from store)
+- Stock levels are checked from EET API in real-time
+- Local and remote stock are combined for availability
+
+Step 8: Hide Missing Products
 If products are no longer in your EET file:
 - They're automatically set to DRAFT status
 - They won't appear on your store front
 
-Step 8: Get Real-Time Updates
+Step 9: Get Real-Time Updates
 The app connects to EET API to get:
 - Latest prices
-- Current stock levels
+- Current stock levels (local, remote, incoming)
 - Availability status
 
 KEEPING TRACK
