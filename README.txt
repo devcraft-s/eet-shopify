@@ -1,29 +1,28 @@
-# EET Shopify Sync
+EET SHOPIFY SYNC
 
 Automatically sync your EET products to your Shopify store. Keep prices, inventory, and product information updated automatically.
 
-## 🚀 What Does It Do?
+WHAT DOES IT DO?
 
 This application helps you:
-- **Sync products** from EET to your Shopify store
-- **Update prices** automatically from EET
-- **Update stock levels** to keep inventory current
-- **Add new products** when they appear in EET
-- **Hide products** automatically when they're no longer available
+- Sync products from EET to your Shopify store
+- Update prices automatically from EET
+- Update stock levels to keep inventory current
+- Add new products when they appear in EET
+- Hide products automatically when they're no longer available
 
-## 📋 What You Need
+WHAT YOU NEED
 
 - Shopify store
-- EET pricing file (`eet_prices.txt`)
+- EET pricing file (eet_prices.txt)
 - EET API credentials
 
-## 🛠️ Quick Setup
+QUICK SETUP
 
-### 1. Environment Setup
+1. Environment Setup
 
-Create a `.env` file in the root directory with your settings:
+Create a .env file in the root directory with your settings:
 
-```env
 # Environment
 PRODUCTION=development
 LANGUAGE=DNK
@@ -38,18 +37,16 @@ SHOPIFY_PRODUCTION_STORE_ADMIN_API=shpat_your_production_token
 # Run Mode
 SCHEDULED_MODE=false
 LOGGING=true
-```
 
-### 2. Add Your EET Pricing File
+2. Add Your EET Pricing File
 
-- Name it `eet_prices.txt`
+- Name it eet_prices.txt
 - Place it in the root directory
 
-### 3. Configure Product Filters (Optional)
+3. Configure Product Filters (Optional)
 
-Edit `config/product-filter.json` to control which products sync:
+Edit config/product-filter.json to control which products sync:
 
-```json
 {
   "include": {
     "brand": ["Axis", "Hikvision", "Sony"]
@@ -59,41 +56,38 @@ Edit `config/product-filter.json` to control which products sync:
   },
   "include_products_limit": 50
 }
-```
 
-## 🎯 How to Use
+HOW TO USE
 
-### Run
-```bash
+Run:
 npm start
-```
 
-## 🔄 Customer Workflow - What Happens When You Run the Sync
+CUSTOMER WORKFLOW - WHAT HAPPENS WHEN YOU RUN THE SYNC
 
-### Step 1: Connect to Your Store
+Step 1: Connect to Your Store
 The app connects to your Shopify store and downloads all existing products.
 
-### Step 2: Read Your EET Pricing File
-It reads your `eet_prices.txt` file and extracts product information including:
+Step 2: Read Your EET Pricing File
+It reads your eet_prices.txt file and extracts product information including:
 - Product names and descriptions
 - Prices
 - Stock quantities
 - Images
 - Brand information
 
-### Step 3: Filter Products (If Configured)
-If you've set up filters in `config/product-filter.json`, it will:
+Step 3: Filter Products (If Configured)
+If you've set up filters in config/product-filter.json, it will:
 - Include only the brands or products you want
 - Exclude specific brands or products
 - Limit the number of products
 
-### Step 4: Compare with Your Store
+Step 4: Compare with Your Store
 The app compares EET products with your Shopify store and determines:
-- **New products** to add
-- **Existing products** that need updates
-- **Missing products** to hide
+- New products to add
+- Existing products that need updates
+- Missing products to hide
 
-### Step 5: Add New Products
+Step 5: Add New Products
 For new products, the app:
 - Creates the product in your Shopify store
 - Sets the title, description, and price
@@ -101,46 +95,45 @@ For new products, the app:
 - Sets stock quantities
 - Configures product metadata
 
-### Step 6: Update Existing Products
+Step 6: Update Existing Products
 For products already in your store, the app:
 - Updates prices from EET
 - Updates stock quantities
 - Refreshes product information
 
-### Step 7: Hide Out-of-Stock Products
+Step 7: Hide Out-of-Stock Products
 If products are no longer in your EET file:
 - They're automatically set to DRAFT status
 - They won't appear on your store front
 
-### Step 8: Get Real-Time Updates
+Step 8: Get Real-Time Updates
 The app connects to EET API to get:
 - Latest prices
 - Current stock levels
 - Availability status
 
-## 📊 Keeping Track
+KEEPING TRACK
 
-### Log Files
-All sync operations are logged to the `logs/` directory:
+Log Files
+All sync operations are logged to the logs/ directory:
 - One log file per run
 - Timestamped for easy tracking
 - Shows success and errors
 
-### What's Logged
+What's Logged
 - Products created successfully
 - Products updated
 - Price changes
 - Stock updates
 - Errors (if any)
 
-## 🔧 Configuration Guide
+CONFIGURATION GUIDE
 
-### Product Filtering
+Product Filtering
 
 Control which products sync to your store:
 
-**Include only specific brands:**
-```json
+Include only specific brands:
 {
   "include": {
     "brand": ["Axis", "Hikvision"]
@@ -148,10 +141,8 @@ Control which products sync to your store:
   "exclude": {},
   "include_products_limit": 100
 }
-```
 
-**Exclude specific products:**
-```json
+Exclude specific products:
 {
   "include": {},
   "exclude": {
@@ -159,44 +150,42 @@ Control which products sync to your store:
   },
   "include_products_limit": 0
 }
-```
 
-### Filter Rules Explained
+Filter Rules Explained
 
-**Include :**
+Include:
 - If a product's brand OR SKU matches your include list, it will be synced
 - Leave empty to sync all products
 
-**Exclude :**
+Exclude:
 - If a product's brand AND SKU both match your exclude list, it won't sync
 - Matches only one? It still syncs
 
-**Limit:**
+Limit:
 - Set maximum number of products to process
 - Set to 0 for no limit
 
-## 📖 Required File Format
+REQUIRED FILE FORMAT
 
-Your `eet_prices.txt` needs these columns (separated by semicolons):
+Your eet_prices.txt needs these columns (separated by semicolons):
 
-| Column | What It Is |
-|--------|------------|
-| `Varenr.` | Product SKU |
-| `Beskrivelse` | Product name |
-| `Pris` | Price |
-| `Lagerbeholdning` | Stock quantity |
-| `Mærke Navn` | Brand name |
-| `Web Category Name` | Category |
-| `Web Picture URL` | Image URL |
-| `Beskrivelse 2` | Additional description |
-| `Beskrivelse 3` | More details |
-| `EAN/UPC` | Barcode |
-| `Bruttovægt` | Weight (kg) |
-| `Manufacturer Part No` | Manufacturer part number |
+Column                      What It Is
+--------------------------- ----------------------------
+Varenr.                     Product SKU
+Beskrivelse                 Product name
+Pris                        Price
+Lagerbeholdning             Stock quantity
+Mærke Navn                  Brand name
+Web Category Name           Category
+Web Picture URL              Image URL
+Beskrivelse 2               Additional description
+Beskrivelse 3               More details
+EAN/UPC                     Barcode
+Bruttovægt                  Weight (kg)
+Manufacturer Part No        Manufacturer part number
 
-## 📁 File Structure
+FILE STRUCTURE
 
-```
 eet-shopify/
 ├── config/
 │   └── product-filter.json   # Your filter settings
@@ -205,19 +194,16 @@ eet-shopify/
 ├── .env                       # Your configuration
 ├── eet_prices.txt            # EET pricing file
 ├── index.js                   # Main application
-└── README.md                  # This file
-```
+└── README.md                  # Documentation
 
-## 🆘 Need Help?
+NEED HELP?
 
 If you run into issues:
 1. Check the troubleshooting section above
-2. Look at log files in the `logs/` directory
+2. Look at log files in the logs/ directory
 3. Contact support with:
    - Error messages you're seeing
    - Log file excerpts
    - Your configuration settings
 
----
-
-**Happy Syncing! 🛒✨**
+Happy Syncing!
