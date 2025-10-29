@@ -1045,6 +1045,98 @@ class ShopifyClient {
   }
 
   /**
+   * Make a single product active
+   * @param {Object} product - Shopify product to make active
+   * @returns {Promise<Object>} Active result with success/error info
+   */
+  async makeProductActive(product) {
+    try {
+      const firstSku = product.variants.nodes[0]?.sku || 'unknown';
+      
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_ACTIVE', 'Making product active', {
+          sku: firstSku,
+          title: product.title,
+          productId: product.id
+        });
+      }
+
+      const activeMutation = `
+        mutation {
+          productUpdate(input: {
+            id: "${product.id}",
+            status: ACTIVE
+          }) {
+            userErrors {
+              field
+              message
+            }
+            product {
+              id
+              title
+              status
+            }
+          }
+        }
+      `;
+
+      const activeResponse = await this.runGraphQL(activeMutation);
+
+      if (activeResponse.data.productUpdate.userErrors.length > 0) {
+        const errors = activeResponse.data.productUpdate.userErrors;
+        
+        if (isLoggingEnabled) {
+          logger.error('SHOPIFY_ACTIVE', 'Product active failed with user errors', {
+            sku: firstSku,
+            title: product.title,
+            errors
+          });
+        }
+
+        return {
+          success: false,
+          sku: firstSku,
+          title: product.title,
+          error: errors.map(e => e.message).join(', ')
+        };
+      } else {
+        if (isLoggingEnabled) {
+          logger.info('SHOPIFY_ACTIVE', 'Product made active successfully', {
+            sku: firstSku,
+            title: product.title,
+            productId: product.id
+          });
+        }
+
+        return {
+          success: true,
+          sku: firstSku,
+          title: product.title,
+          productId: product.id
+        };
+      }
+
+    } catch (error) {
+      const firstSku = product.variants.nodes[0]?.sku || 'unknown';
+      
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_ACTIVE', 'Failed to make product active', {
+          sku: firstSku,
+          title: product.title,
+          error: error.message
+        });
+      }
+
+      return {
+        success: false,
+        sku: firstSku,
+        title: product.title,
+        error: error.message
+      };
+    }
+  }
+
+  /**
    * Make Shopify products that are not in EET list into drafts
    * @param {Array} shopifyProducts - Array of all Shopify products
    * @param {Array} eetProducts - Array of EET products
