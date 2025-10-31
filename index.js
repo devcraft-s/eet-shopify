@@ -95,6 +95,22 @@ async function main() {
     const shopifyConfig = loadShopifyConfig();
     const shopifyClient = new ShopifyClient(shopifyConfig);
     
+    // STEP 0: Get online channel ID
+    if (isLoggingEnabled) {
+      logger.info('SHOPIFY', 'Getting online channel ID');
+    }
+    const onlineChannelId = await shopifyClient.getOnlineChannelId();
+    
+    if (isLoggingEnabled) {
+      if (onlineChannelId) {
+        logger.info('SHOPIFY', 'Online channel ID retrieved successfully', {
+          channelId: onlineChannelId
+        });
+      } else {
+        logger.warn('SHOPIFY', 'Online channel ID not found');
+      }
+    }
+    
     // Get all products from Shopify
     const shopifyProducts = await shopifyClient.getAllProducts();
     

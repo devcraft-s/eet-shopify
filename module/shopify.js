@@ -1538,6 +1538,75 @@ class ShopifyClient {
   }
 
   /**
+   * Get the online channel ID from Shopify
+   * @returns {Promise<string|null>} Online channel ID or null if not found
+   */
+  async getOnlineChannelId() {
+    try {
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_CHANNEL', 'Fetching online channel ID');
+      }
+
+      const query = `
+        query MyQuery {
+          shop {
+            channels(first: 10) {
+              nodes {
+                id
+                name
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await this.runGraphQL(query);
+      
+      if (!response.data || !response.data.shop || !response.data.shop.channels) {
+        if (isLoggingEnabled) {
+          logger.warn('SHOPIFY_CHANNEL', 'No channels data found in response');
+        }
+        return null;
+      }
+
+      const channels = response.data.shop.channels.nodes || [];
+      
+      // Find the online channel (typically named "Online Store" or contains "Online")
+      const onlineChannel = channels.find(channel => 
+        channel.name && (
+          channel.name.toLowerCase().includes('online') || 
+          channel.name.toLowerCase() === 'online store'
+        )
+      );
+
+      if (onlineChannel) {
+        if (isLoggingEnabled) {
+          logger.info('SHOPIFY_CHANNEL', 'Online channel found', {
+            channelId: onlineChannel.id,
+            channelName: onlineChannel.name
+          });
+        }
+        return onlineChannel.id;
+      } else {
+        if (isLoggingEnabled) {
+          logger.warn('SHOPIFY_CHANNEL', 'Online channel not found', {
+            availableChannels: channels.map(c => c.name)
+          });
+        }
+        return null;
+      }
+
+    } catch (error) {
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_CHANNEL', 'Failed to get online channel ID', {
+          error: error.message
+        });
+      }
+      throw error;
+    }
+  }
+
+  /**
    * 
    */
   async updateStockObject(sku, stockObject, product) {
