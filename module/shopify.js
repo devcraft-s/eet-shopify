@@ -21,6 +21,7 @@ class ShopifyClient {
     this.accessToken = config.accessToken;
     this.apiVersion = config.apiVersion || '2025-10';
     this.apiUrl = `https://${this.shopDomain}/admin/api/${this.apiVersion}/graphql.json`;
+    this.cachedChannelId = null; // Cache for online channel ID
   }
 
   /**
@@ -1108,6 +1109,9 @@ class ShopifyClient {
           });
         }
 
+        // Publish product to online channel after making it active
+        await this.publishProductToChannel(product);
+
         return {
           success: true,
           sku: firstSku,
@@ -1121,6 +1125,126 @@ class ShopifyClient {
       
       if (isLoggingEnabled) {
         logger.error('SHOPIFY_ACTIVE', 'Failed to make product active', {
+          sku: firstSku,
+          title: product.title,
+          error: error.message
+        });
+      }
+
+      return {
+        success: false,
+        sku: firstSku,
+        title: product.title,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Publish a product to the online channel
+   * @param {Object} product - Shopify product to publish
+   * @param {string} channelId - Optional channel ID. If not provided, will fetch the online channel ID (cached)
+   * @returns {Promise<Object>} Publish result with success/error info
+   */
+  async publishProductToChannel(product, channelId = null) {
+    try {
+      const firstSku = product.variants.nodes[0]?.sku || 'unknown';
+      
+      // Get channel ID if not provided (use cache if available)
+      let targetChannelId = channelId;
+      if (!targetChannelId) {
+        if (!this.cachedChannelId) {
+          this.cachedChannelId = await this.getOnlineChannelId();
+        }
+        targetChannelId = this.cachedChannelId;
+      }
+
+      if (!targetChannelId) {
+        if (isLoggingEnabled) {
+          logger.warn('SHOPIFY_PUBLISH', 'Online channel ID not found, skipping publish', {
+            sku: firstSku,
+            title: product.title
+          });
+        }
+        return {
+          success: false,
+          sku: firstSku,
+          title: product.title,
+          error: 'Online channel ID not found'
+        };
+      }
+
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_PUBLISH', 'Publishing product to online channel', {
+          sku: firstSku,
+          title: product.title,
+          productId: product.id,
+          channelId: targetChannelId
+        });
+      }
+
+      const publishMutation = `
+        mutation {
+          publishablePublish(
+            id: "${product.id}"
+            input: {channelId: "${targetChannelId}"}
+          ) {
+            publishable {
+              publicationCount
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const publishResponse = await this.runGraphQL(publishMutation);
+
+      if (publishResponse.data.publishablePublish.userErrors && publishResponse.data.publishablePublish.userErrors.length > 0) {
+        const errors = publishResponse.data.publishablePublish.userErrors;
+        
+        if (isLoggingEnabled) {
+          logger.error('SHOPIFY_PUBLISH', 'Product publish failed with user errors', {
+            sku: firstSku,
+            title: product.title,
+            errors
+          });
+        }
+
+        return {
+          success: false,
+          sku: firstSku,
+          title: product.title,
+          error: errors.map(e => e.message).join(', ')
+        };
+      } else {
+        const publicationCount = publishResponse.data.publishablePublish.publishable?.publicationCount || 0;
+        
+        if (isLoggingEnabled) {
+          logger.info('SHOPIFY_PUBLISH', 'Product published successfully', {
+            sku: firstSku,
+            title: product.title,
+            productId: product.id,
+            publicationCount
+          });
+        }
+
+        return {
+          success: true,
+          sku: firstSku,
+          title: product.title,
+          productId: product.id,
+          publicationCount
+        };
+      }
+
+    } catch (error) {
+      const firstSku = product.variants.nodes[0]?.sku || 'unknown';
+      
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_PUBLISH', 'Failed to publish product', {
           sku: firstSku,
           title: product.title,
           error: error.message
@@ -1580,6 +1704,9 @@ class ShopifyClient {
       );
 
       if (onlineChannel) {
+        // Cache the channel ID for future use
+        this.cachedChannelId = onlineChannel.id;
+        
         if (isLoggingEnabled) {
           logger.info('SHOPIFY_CHANNEL', 'Online channel found', {
             channelId: onlineChannel.id,
