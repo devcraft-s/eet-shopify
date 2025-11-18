@@ -933,6 +933,23 @@ class ShopifyClient {
         }
       }
       
+      // Add brand tag to the product
+      const brandName = productData.vendor || '';
+      if (brandName) {
+        try {
+          await this.addProductTags(createdProduct.id, [brandName]);
+        } catch (tagError) {
+          // Log but don't fail product creation if tag addition fails
+          if (isLoggingEnabled) {
+            logger.warn('SHOPIFY_CREATE', 'Failed to add brand tag', {
+              productId: createdProduct.id,
+              brandName,
+              error: tagError.message
+            });
+          }
+        }
+      }
+
       if (isLoggingEnabled) {
         logger.info('SHOPIFY_CREATE', 'Product created successfully', {
           productId: createdProduct.id,
@@ -950,6 +967,87 @@ class ShopifyClient {
         });
       }
       throw error;
+    }
+  }
+
+  /**
+   * Add tags to a product using tagsAdd mutation
+   * @param {string} productId - Shopify product ID
+   * @param {Array<string>} tags - Array of tags to add
+   * @returns {Promise<Object>} Result with success/error info
+   */
+  async addProductTags(productId, tags) {
+    try {
+      if (!tags || tags.length === 0) {
+        return { success: true, message: 'No tags to add' };
+      }
+
+      // Filter out empty tags
+      const validTags = tags.filter(tag => tag && tag.trim().length > 0);
+      
+      if (validTags.length === 0) {
+        return { success: true, message: 'No valid tags to add' };
+      }
+
+      if (isLoggingEnabled) {
+        logger.info('SHOPIFY_TAGS', 'Adding tags to product', {
+          productId,
+          tags: validTags
+        });
+      }
+
+      const mutation = `
+        mutation tagsAdd($id: ID!, $tags: [String!]!) {
+          tagsAdd(id: $id, tags: $tags) {
+            node {
+              id
+            }
+            userErrors {
+              message
+            }
+          }
+        }
+      `;
+
+      const variables = {
+        id: productId,
+        tags: validTags
+      };
+
+      const response = await this.runGraphQL(mutation, variables);
+
+      if (response.data.tagsAdd.userErrors && response.data.tagsAdd.userErrors.length > 0) {
+        const errors = response.data.tagsAdd.userErrors;
+        const errorMessage = `Tag addition failed: ${errors.map(e => e.message).join(', ')}`;
+        
+        if (isLoggingEnabled) {
+          logger.error('SHOPIFY_TAGS', 'Tag addition failed', {
+            productId,
+            tags: validTags,
+            errors
+          });
+        }
+        
+        return { success: false, error: errorMessage };
+      } else {
+        if (isLoggingEnabled) {
+          logger.info('SHOPIFY_TAGS', 'Tags added successfully', {
+            productId,
+            tags: validTags
+          });
+        }
+        
+        return { success: true, tags: validTags };
+      }
+    } catch (error) {
+      if (isLoggingEnabled) {
+        logger.error('SHOPIFY_TAGS', 'Failed to add tags', {
+          productId,
+          tags,
+          error: error.message
+        });
+      }
+      return { success: false, error: error.message };
     }
   }
 

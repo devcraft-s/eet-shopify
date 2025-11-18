@@ -312,6 +312,10 @@ async function main() {
             const sku = eetItem.ItemId;
             const product = shopifyClient.findProductBySKU(sku, shopifyProducts);
 
+            // Find the EET product to get brand name
+            const eetProduct = jsonData.products.find(p => p.varenr === sku);
+            const brandName = eetProduct?.maerke_navn || '';
+
             // if eetItem.Price is not empty
             // price = eetItem.Price.Price + eetItem.Price.VatAmount
             let price = null;
@@ -356,6 +360,22 @@ async function main() {
               // make product draft
               if (product) {
                 await shopifyClient.makeProductDraft(product);
+              }
+            }
+
+            // Add brand tag to the product
+            if (product && brandName) {
+              try {
+                await shopifyClient.addProductTags(product.id, [brandName]);
+              } catch (tagError) {
+                // Log but don't fail update if tag addition fails
+                if (isLoggingEnabled) {
+                  logger.warn('EET_UPDATE', 'Failed to add brand tag', {
+                    sku,
+                    brandName,
+                    error: tagError.message
+                  });
+                }
               }
             }
 
