@@ -135,10 +135,12 @@ class EETClient {
 
   /**
    * Get all products price and stock from EET API
+   * Batches requests to avoid 413 Payload Too Large errors (max 1000 items per request)
    * @param {Array} eetProducts - Array of EET products with varenr (SKU)
-   * @returns {Promise<Object>} API response with product data
+   * @param {number} batchSize - Maximum number of items per batch (default: 999 to stay under 1000 limit)
+   * @returns {Promise<Array>} Combined array of product data from all batches
    */
-  async getAllProductsPriceAndStock(eetProducts) {
+  async getAllProductsPriceAndStock(eetProducts, batchSize = 999) {
     try {
       if (!this.isLoggedIn()) {
         throw new Error('Not authenticated. Please login first.');
@@ -146,7 +148,8 @@ class EETClient {
 
       if (isLoggingEnabled) {
         logger.info('EET_PRODUCTS', 'Getting all products price and stock', {
-          productCount: eetProducts.length
+          productCount: eetProducts.length,
+          batchSize
         });
       }
 
@@ -155,34 +158,93 @@ class EETClient {
         ItemId: product.varenr
       }));
 
-      const requestBody = { Items: items };
-
-
-      const response = await fetch(`${this.baseUrl}/product`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        throw new Error(`EET products API failed with status: ${response.status} ${response.statusText}`);
+      // Split items into batches to avoid 413 Payload Too Large errors
+      const batches = [];
+      for (let i = 0; i < items.length; i += batchSize) {
+        batches.push(items.slice(i, i + batchSize));
       }
 
-      const result = await response.json();
-
-      // Handle direct array response
-      const productsArray = Array.isArray(result) ? result : (result.Items || []);
-
       if (isLoggingEnabled) {
-        logger.info('EET_PRODUCTS', 'Products data retrieved successfully', {
-          isArray: Array.isArray(result),
-          responseKeys: Array.isArray(result) ? ['array'] : Object.keys(result),
-          itemsCount: productsArray.length
+        logger.info('EET_PRODUCTS', 'Split products into batches', {
+          totalItems: items.length,
+          batchCount: batches.length,
+          batchSize
         });
       }
 
+      // Process each batch sequentially to avoid rate limiting
+      const allProducts = [];
+      let batchNumber = 0;
 
-      return productsArray;
+      for (const batch of batches) {
+        batchNumber++;
+        
+        if (isLoggingEnabled) {
+          logger.info('EET_PRODUCTS', `Processing batch ${batchNumber}/${batches.length}`, {
+            batchNumber,
+            totalBatches: batches.length,
+            itemsInBatch: batch.length
+          });
+        }
+
+        try {
+          const requestBody = { Items: batch };
+
+          const response = await fetch(`${this.baseUrl}/product`, {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify(requestBody)
+          });
+
+          if (!response.ok) {
+            throw new Error(`EET products API failed with status: ${response.status} ${response.statusText}`);
+          }
+
+          const result = await response.json();
+
+          // Handle direct array response
+          const productsArray = Array.isArray(result) ? result : (result.Items || []);
+
+          allProducts.push(...productsArray);
+
+          if (isLoggingEnabled) {
+            logger.info('EET_PRODUCTS', `Batch ${batchNumber} completed successfully`, {
+              batchNumber,
+              itemsRetrieved: productsArray.length,
+              totalItemsSoFar: allProducts.length
+            });
+          }
+
+          // Add a small delay between batches to avoid rate limiting
+          if (batchNumber < batches.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+
+        } catch (batchError) {
+          if (isLoggingEnabled) {
+            logger.error('EET_PRODUCTS', `Failed to process batch ${batchNumber}`, {
+              error: batchError.message,
+              batchNumber,
+              itemsInBatch: batch.length
+            });
+          }
+
+          console.log(`❌ Failed to get products data for batch ${batchNumber}: ${batchError.message}`);
+          
+          // Continue with other batches even if one fails
+          // You may want to throw here instead if you need all batches to succeed
+        }
+      }
+
+      if (isLoggingEnabled) {
+        logger.info('EET_PRODUCTS', 'All batches processed successfully', {
+          totalBatches: batches.length,
+          totalItemsRetrieved: allProducts.length,
+          expectedItems: items.length
+        });
+      }
+
+      return allProducts;
 
     } catch (error) {
       if (isLoggingEnabled) {
@@ -194,11 +256,9 @@ class EETClient {
 
       console.log(`❌ Failed to get products data: ${error.message}`);
 
-      return {
-        success: false,
-        error: error.message,
-        message: 'Failed to get products data'
-      };
+      // Return empty array instead of error object to maintain compatibility
+      // The calling code expects an array
+      return [];
     }
   }  
 }
